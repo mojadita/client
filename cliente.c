@@ -1,7 +1,10 @@
-/* $Id: cliente.c,v 1.2 1998/04/04 11:45:36 luis Exp $
- * Author: Luis Colorado <luis.colorado@slug.ctv.es>
+/* $Id: cliente.c,v 1.3 2000/07/16 23:58:18 luis Exp $
+ * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Thu Feb 26 12:44:15 MET 1998
  * $Log: cliente.c,v $
+ * Revision 1.3  2000/07/16 23:58:18  luis
+ * Change in the email address of the author.
+ *
  * Revision 1.2  1998/04/04 11:45:36  luis
  * Included options to check individually for EOF on connection/local sides
  *
@@ -213,4 +216,4 @@ do_usage ()
 	exit (0);
 }
 
-/* $Id: cliente.c,v 1.2 1998/04/04 11:45:36 luis Exp $ */
+/* $Id: cliente.c,v 1.3 2000/07/16 23:58:18 luis Exp $ */
