@@ -1,7 +1,10 @@
-/* $Id: cliente.c,v 1.1 1998/02/26 19:31:07 luis Exp $
+/* $Id: cliente.c,v 1.2 1998/04/04 11:45:36 luis Exp $
  * Author: Luis Colorado <luis.colorado@slug.ctv.es>
  * Date: Thu Feb 26 12:44:15 MET 1998
  * $Log: cliente.c,v $
+ * Revision 1.2  1998/04/04 11:45:36  luis
+ * Included options to check individually for EOF on connection/local sides
+ *
  * Revision 1.1  1998/02/26 19:31:07  luis
  * Initial revision
  *
@@ -31,6 +34,8 @@ extern int optind, opterr, optopt;
 #define FLAG_EOFSTDIN	2
 #define FLAG_EOFSOCKET	4
 #define FLAG_EOFALL	6
+#define FLAG_OPTEOFLOCL	8
+#define FLAG_OPTEOFCONN 16
 
 int flags = 0;
 
@@ -45,12 +50,14 @@ main (int argc, char **argv)
 	static struct timeval timeout = { 0, 0 }, *t;
 
 	/* process the program options... */
-	while ((opt = getopt(argc, argv, "h:p:dt:")) != EOF) {
+	while ((opt = getopt(argc, argv, "h:p:dt:cl")) != EOF) {
 		switch (opt) {
 		case 'p':  serverport = optarg; break;
 		case 'h':  servername = optarg; break;
 		case 'd':  flags |= FLAG_DEBUG; break;
 		case 't':  timeout.tv_sec = abs(atoi(optarg)); break;
+		case 'l':  flags |= FLAG_OPTEOFLOCL; break;
+		case 'c':  flags |= FLAG_OPTEOFCONN; break;
 		default: do_usage(EXIT_FAILURE);
 		}
 	}
@@ -130,6 +137,14 @@ main (int argc, char **argv)
 							PROGNAME
 							": stdin EOF\n");
 					}
+					if (flags & FLAG_OPTEOFLOCL) {
+					  if (flags & FLAG_DEBUG) {
+					    fprintf (stderr,
+					      PROGNAME
+					      ": EOF stdin -> EXIT\n");
+					  }
+					  exit (EXIT_SUCCESS);
+					}
 				}
 			}
 			if (FD_ISSET(sd, &readset)) {
@@ -139,6 +154,14 @@ main (int argc, char **argv)
 						fprintf (stderr,
 							PROGNAME
 							": socket EOF\n");
+					}
+					if (flags & FLAG_OPTEOFCONN) {
+					  if (flags & FLAG_DEBUG) {
+					    fprintf (stderr,
+					      PROGNAME
+					      ": EOF socket -> EXIT\n");
+					  }
+					  exit (EXIT_SUCCESS);
 					}
 				}
 			}
@@ -185,7 +208,9 @@ do_usage ()
   	fprintf (stderr, "  -p service Specifies the port to connect to.\n");
   	fprintf (stderr, "  -d         Debug. Be verbose.\n");
   	fprintf (stderr, "  -t timeout Set a timeout in secs. (def. no timeout).\n");
+	fprintf (stderr, "  -l         EOF on local side forces exit\n");
+	fprintf (stderr, "  -c         EOF on connection side forces exit\n");
 	exit (0);
 }
 
-/* $Id: cliente.c,v 1.1 1998/02/26 19:31:07 luis Exp $ */
+/* $Id: cliente.c,v 1.2 1998/04/04 11:45:36 luis Exp $ */
