@@ -1,0 +1,191 @@
+/* $Id: cliente.c,v 1.1 1998/02/26 19:31:07 luis Exp $
+ * Author: Luis Colorado <luis.colorado@slug.ctv.es>
+ * Date: Thu Feb 26 12:44:15 MET 1998
+ * $Log: cliente.c,v $
+ * Revision 1.1  1998/02/26 19:31:07  luis
+ * Initial revision
+ *
+ */
+
+#define DEFAULT_SERVER "127.0.0.1"
+#define DEFAULT_SERVICE "telnet"
+#define PROGNAME	"cliente"
+
+#include <sys/types.h>
+#include <sys/time.h>
+#include <time.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <netdb.h>
+
+extern char *optarg;
+extern int optind, opterr, optopt;
+
+#define FLAG_DEBUG	1
+#define FLAG_EOFSTDIN	2
+#define FLAG_EOFSOCKET	4
+#define FLAG_EOFALL	6
+
+int flags = 0;
+
+main (int argc, char **argv)
+{
+	int opt, sd, res;
+	struct sockaddr_in server;
+	struct servent *service, fallback;
+	struct hostent *host;
+	char *servername = DEFAULT_SERVER;
+	char *serverport = DEFAULT_SERVICE;
+	static struct timeval timeout = { 0, 0 }, *t;
+
+	/* process the program options... */
+	while ((opt = getopt(argc, argv, "h:p:dt:")) != EOF) {
+		switch (opt) {
+		case 'p':  serverport = optarg; break;
+		case 'h':  servername = optarg; break;
+		case 'd':  flags |= FLAG_DEBUG; break;
+		case 't':  timeout.tv_sec = abs(atoi(optarg)); break;
+		default: do_usage(EXIT_FAILURE);
+		}
+	}
+
+	t = (timeout.tv_sec > 0) ? &timeout : NULL;
+	/* Obtain the server/port info */
+	service = getservbyname (serverport, "tcp");
+	if (!service)
+		service = getservbyport(atoi(serverport), "tcp");
+	if (!service) {
+		service = &fallback;
+		fallback.s_port = htons(atoi(serverport));
+	}
+	host = gethostbyname (servername);
+	if (!host) {
+		fprintf (stderr,
+			PROGNAME ": error: %s does not exist\n",
+			servername);
+		exit (EXIT_FAILURE);
+	}
+
+	/* Construct the sockaddr_in for the connect system call */
+	server.sin_family = AF_INET;
+	server.sin_port = service->s_port;
+	server.sin_addr = *(struct in_addr *)(host->h_addr_list[0]);
+
+	if (flags & FLAG_DEBUG) {
+		fprintf (stderr, "Trying %s:%d\n",
+			inet_ntoa(server.sin_addr),
+			ntohs (server.sin_port));
+	}
+
+	/* Connect to the server */
+	sd = socket (AF_INET, SOCK_STREAM, 0);
+	if (sd == -1) {
+		perror (PROGNAME ": socket");
+	}
+	res = connect (sd, (struct sockaddr *)&server, sizeof server);
+	if (res == -1) {
+		perror (PROGNAME ": connect");
+	}
+
+	/* Construct the FD_SET for the select system call */
+	for (;;) {
+		fd_set readset;
+
+		/* Check for EOF on both paths */
+		if ((flags & FLAG_EOFALL) == FLAG_EOFALL) {
+			break;
+		}
+
+		/* prepare the select call... */
+		FD_ZERO(&readset);
+		if (!(flags & FLAG_EOFSTDIN))
+			FD_SET(0, &readset);
+		if (!(flags & FLAG_EOFSOCKET))
+			FD_SET(sd, &readset);
+
+		res = select (sd+1, &readset, NULL, NULL, t);
+		switch (res) {
+		case -1: /* error in select */
+			perror (PROGNAME ": select");
+			exit (EXIT_FAILURE);
+		case 0: /* Timeout */
+			if (flags & FLAG_DEBUG) {
+				fprintf (stderr,
+					PROGNAME ": Timeout\n");
+				exit (EXIT_SUCCESS);
+			}
+			break;
+		default: /* Data on some direction */
+			if (FD_ISSET(0, &readset)) {
+				if (process(0, sd)) {
+					flags |= FLAG_EOFSTDIN;
+					if (flags & FLAG_DEBUG) {
+						fprintf (stderr,
+							PROGNAME
+							": stdin EOF\n");
+					}
+				}
+			}
+			if (FD_ISSET(sd, &readset)) {
+				if (process(sd, 1)) {
+					flags |= FLAG_EOFSOCKET;
+					if (flags & FLAG_DEBUG) {
+						fprintf (stderr,
+							PROGNAME
+							": socket EOF\n");
+					}
+				}
+			}
+		}
+	} /* for (;;) */
+}
+
+int process (int fd_in, int fd_out)
+{
+	char buffer[BUFSIZ], *p = buffer;
+	int res, tam;
+
+	/* let's read the data into the buffer in chunks of BUFSIZ. */
+	res = read (fd_in, buffer, sizeof buffer);
+
+	switch (res) {
+	case -1: /* READ ERROR */
+		perror (PROGNAME ": read");
+		exit (EXIT_FAILURE);
+	case 0: /* EOF ON INPUT */
+		return -1;
+	default: /* WE HAVE DATA, SO WRITE IT TO fd_out */
+		tam = res;
+		p = buffer;
+		/* PERHAPS WE CAN'T DO IT IN ONE CHUNK */
+		while (tam > 0) {
+			res = write (fd_out, p, tam);
+			if (res == -1) {
+				perror (PROGNAME": write");
+				exit (EXIT_FAILURE);
+			}
+			tam -= res; p += res;
+		}
+		return 0;
+	}
+}
+
+
+do_usage ()
+{
+	fprintf (stderr, "Usage: " PROGNAME " [ options ...]\n");
+	fprintf (stderr, "Options:\n");
+  	fprintf (stderr, "  -h server  Specifies a host to contact.\n");
+  	fprintf (stderr, "  -p service Specifies the port to connect to.\n");
+  	fprintf (stderr, "  -d         Debug. Be verbose.\n");
+  	fprintf (stderr, "  -t timeout Set a timeout in secs. (def. no timeout).\n");
+	exit (0);
+}
+
+/* $Id: cliente.c,v 1.1 1998/02/26 19:31:07 luis Exp $ */
