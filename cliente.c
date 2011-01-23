@@ -1,8 +1,14 @@
-/* $Id: cliente.c,v 1.3 2000/07/16 23:58:18 luis Exp $
- * Author: Luis Colorado <luis.colorado@hispalinux.es>
+/* $Id: cliente.c,v 1.4 2011/01/23 00:59:39 luis Exp $
+ * Author: Luis Colorado <lc@luiscoloradosistemas.com>
  * Date: Thu Feb 26 12:44:15 MET 1998
  * $Log: cliente.c,v $
- * Revision 1.3  2000/07/16 23:58:18  luis
+ * Revision 1.4  2011/01/23 00:59:39  luis
+ * * Changed author email in cliente.c
+ * * Added comments on closing braces to pair the control sentence.
+ * * Added nmeasrv.c as an example of server listening for connections on
+ *   a specific port.  Doesn't work well when specifying input file yet.
+ *
+ * Revision 1.3  2000-07-16 23:58:18  luis
  * Change in the email address of the author.
  *
  * Revision 1.2  1998/04/04 11:45:36  luis
@@ -42,7 +48,10 @@ extern int optind, opterr, optopt;
 
 int flags = 0;
 
-main (int argc, char **argv)
+void do_usage (void);
+int process (int fd_in, int fd_out);
+
+int main (int argc, char **argv)
 {
 	int opt, sd, res;
 	struct sockaddr_in server;
@@ -61,9 +70,9 @@ main (int argc, char **argv)
 		case 't':  timeout.tv_sec = abs(atoi(optarg)); break;
 		case 'l':  flags |= FLAG_OPTEOFLOCL; break;
 		case 'c':  flags |= FLAG_OPTEOFCONN; break;
-		default: do_usage(EXIT_FAILURE);
-		}
-	}
+		default: do_usage();
+		} /* switch */
+	} /* while */
 
 	t = (timeout.tv_sec > 0) ? &timeout : NULL;
 	/* Obtain the server/port info */
@@ -73,14 +82,14 @@ main (int argc, char **argv)
 	if (!service) {
 		service = &fallback;
 		fallback.s_port = htons(atoi(serverport));
-	}
+	} /* if */
 	host = gethostbyname (servername);
 	if (!host) {
 		fprintf (stderr,
 			PROGNAME ": error: %s does not exist\n",
 			servername);
 		exit (EXIT_FAILURE);
-	}
+	} /* if */
 
 	/* Construct the sockaddr_in for the connect system call */
 	server.sin_family = AF_INET;
@@ -91,17 +100,17 @@ main (int argc, char **argv)
 		fprintf (stderr, "Trying %s:%d\n",
 			inet_ntoa(server.sin_addr),
 			ntohs (server.sin_port));
-	}
+	} /* if */
 
 	/* Connect to the server */
 	sd = socket (AF_INET, SOCK_STREAM, 0);
 	if (sd == -1) {
 		perror (PROGNAME ": socket");
-	}
+	} /* if */
 	res = connect (sd, (struct sockaddr *)&server, sizeof server);
 	if (res == -1) {
 		perror (PROGNAME ": connect");
-	}
+	} /* if */
 
 	/* Construct the FD_SET for the select system call */
 	for (;;) {
@@ -110,7 +119,7 @@ main (int argc, char **argv)
 		/* Check for EOF on both paths */
 		if ((flags & FLAG_EOFALL) == FLAG_EOFALL) {
 			break;
-		}
+		} /* if */
 
 		/* prepare the select call... */
 		FD_ZERO(&readset);
@@ -129,7 +138,7 @@ main (int argc, char **argv)
 				fprintf (stderr,
 					PROGNAME ": Timeout\n");
 				exit (EXIT_SUCCESS);
-			}
+			} /* if */
 			break;
 		default: /* Data on some direction */
 			if (FD_ISSET(0, &readset)) {
@@ -139,17 +148,17 @@ main (int argc, char **argv)
 						fprintf (stderr,
 							PROGNAME
 							": stdin EOF\n");
-					}
+					} /* if */
 					if (flags & FLAG_OPTEOFLOCL) {
 					  if (flags & FLAG_DEBUG) {
 					    fprintf (stderr,
 					      PROGNAME
 					      ": EOF stdin -> EXIT\n");
-					  }
+					  } /* if */
 					  exit (EXIT_SUCCESS);
-					}
-				}
-			}
+					} /* if */
+				} /* if */
+			} /* if */
 			if (FD_ISSET(sd, &readset)) {
 				if (process(sd, 1)) {
 					flags |= FLAG_EOFSOCKET;
@@ -157,20 +166,20 @@ main (int argc, char **argv)
 						fprintf (stderr,
 							PROGNAME
 							": socket EOF\n");
-					}
+					} /* if */
 					if (flags & FLAG_OPTEOFCONN) {
 					  if (flags & FLAG_DEBUG) {
 					    fprintf (stderr,
 					      PROGNAME
 					      ": EOF socket -> EXIT\n");
-					  }
+					  } /* if */
 					  exit (EXIT_SUCCESS);
-					}
-				}
-			}
-		}
+					} /* if */
+				} /* if */
+			} /* if */
+		} /* switch */
 	} /* for (;;) */
-}
+} /* main */
 
 int process (int fd_in, int fd_out)
 {
@@ -195,15 +204,14 @@ int process (int fd_in, int fd_out)
 			if (res == -1) {
 				perror (PROGNAME": write");
 				exit (EXIT_FAILURE);
-			}
+			} /* if */
 			tam -= res; p += res;
-		}
+		} /* if */
 		return 0;
-	}
-}
+	} /* switch */
+} /* process */
 
-
-do_usage ()
+void do_usage ()
 {
 	fprintf (stderr, "Usage: " PROGNAME " [ options ...]\n");
 	fprintf (stderr, "Options:\n");
@@ -214,6 +222,6 @@ do_usage ()
 	fprintf (stderr, "  -l         EOF on local side forces exit\n");
 	fprintf (stderr, "  -c         EOF on connection side forces exit\n");
 	exit (0);
-}
+} /* do_usage */
 
-/* $Id: cliente.c,v 1.3 2000/07/16 23:58:18 luis Exp $ */
+/* $Id: cliente.c,v 1.4 2011/01/23 00:59:39 luis Exp $ */
