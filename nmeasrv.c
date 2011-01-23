@@ -1,4 +1,4 @@
-/* $Id: nmeasrv.c,v 1.1 2011/01/23 00:59:40 luis Exp $
+/* $Id: nmeasrv.c,v 1.2 2011/01/23 13:11:46 luis Exp $
  * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
@@ -7,7 +7,14 @@
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
  * $Log: nmeasrv.c,v $
- * Revision 1.1  2011/01/23 00:59:40  luis
+ * Revision 1.2  2011/01/23 13:11:46  luis
+ * * input device is open only in presence of connections, closed otherwise
+ *   (except if input is from stdin, which is not closed).
+ * * corrected an error with 'flags' being used for two conflicting variables.
+ * * Traffic log consists now in only the number of bytes between square
+ *   brackets.
+ *
+ * Revision 1.1  2011-01-23 00:59:40  luis
  * * Changed author email in cliente.c
  * * Added comments on closing braces to pair the control sentence.
  * * Added nmeasrv.c as an example of server listening for connections on
@@ -38,6 +45,7 @@ extern int optind, opterr, optopt;
 #define FLAG_DEBUG		1
 
 int flags = 0;
+
 char *in_filename = NULL;
 char *in_port = "nmeasrv";
 int in_fd = 0;
@@ -45,6 +53,7 @@ int in_fd = 0;
 int sd_bind_socket = -1;
 
 int sd_out[MAX];
+int n_out = 0;
 
 void do_usage ()
 {
@@ -134,12 +143,13 @@ int main (int argc, char **argv)
 	/* Construct the FD_SET for the select system call */
 	for (;;) {
 		fd_set readset;
+		int sd_max = 0;
 
-		/* prepare the select call... */
-		if (in_fd < 0) {
+		if ((in_fd < 0) && (n_out > 0)) {
 			if (flags & FLAG_DEBUG) {
 				fprintf(stderr,
-					PROGNAME ": opening %s for input\n", in_filename);
+					PROGNAME ": opening %s for input\n",
+					in_filename);
 			} /* if */
 			in_fd = open(in_filename, O_RDONLY);
 			if (in_fd < 0) {
@@ -147,16 +157,21 @@ int main (int argc, char **argv)
 					PROGNAME,
 					strerror(errno),
 					errno);
-				sleep(5);
+				sleep(1);
 				continue;
 			} /* if */
 		} /* if */
 
+		/* prepare the select call... */
 		FD_ZERO(&readset);
-		FD_SET(in_fd, &readset);
+		if (in_fd >= 0) {
+			sd_max = in_fd;
+			FD_SET(in_fd, &readset);
+		} /* if */
 		FD_SET(sd, &readset);
+		if (sd > sd_max) sd_max = sd;
 
-		res = select (sd+1, &readset, NULL, NULL, NULL);
+		res = select (sd_max+1, &readset, NULL, NULL, NULL);
 		switch (res) {
 		case -1: /* error in select */
 			perror (PROGNAME ": select");
@@ -186,6 +201,7 @@ int main (int argc, char **argv)
 					close(new_sd);
 					continue;
 				} /* if */
+				n_out++;
 				if (flags & FLAG_DEBUG) {
 					fprintf(stderr,
 						PROGNAME ": New connection from %s:%d (slot %d, sd %d)\n",
@@ -194,25 +210,26 @@ int main (int argc, char **argv)
 						i, sd_out[i]);
 				} /* if */
 			} /* if */
-			if (FD_ISSET(in_fd, &readset)) {
+			if ((in_fd >= 0) && FD_ISSET(in_fd, &readset)) {
 				static char buffer [1024];
 				int n;
-				int flags = fcntl(in_fd, F_GETFL);
-				fcntl(in_fd, F_SETFL, flags | O_NONBLOCK);
+				int fl = fcntl(in_fd, F_GETFL);
+				fcntl(in_fd, F_SETFL, fl | O_NONBLOCK);
 				n = read(in_fd, buffer, sizeof buffer);
 				if (n <= 0) {
 					close(in_fd);
 					in_fd = -1;
 					if (flags & FLAG_DEBUG) {
 						fprintf(stderr,
-							PROGNAME ": CLOSING INPUT.\n");
+							PROGNAME ": closing input file %s at descriptor %d.\n",
+							in_filename, in_fd);
 					} /* if */
 					continue;
 				} /* if */
-				fcntl(in_fd, F_SETFL, flags);
+				fcntl(in_fd, F_SETFL, fl);
 				if (flags & FLAG_DEBUG) {
 					fprintf(stderr,
-						PROGNAME ": %d data from input channel.\n",
+						"[%d]",
 						n);
 				} /* if */
 				for (i = 0; i < MAX; i++) {
@@ -225,7 +242,18 @@ int main (int argc, char **argv)
 									i);
 							} /* if */
 							close(sd_out[i]);
+							n_out--;
 							sd_out[i] = -1;
+							if ((n_out == 0) && (in_fd != 0)) {
+								if (flags & FLAG_DEBUG) {
+									fprintf(stderr,
+										PROGNAME ": closing input file %s at descriptor %d, as no clients connected\n",
+										in_filename,
+										in_fd);
+								} /* if */
+								close(in_fd);
+								in_fd = -1;
+							} /* if */
 						} /* if */
 					} /* if */
 				} /* for */
@@ -234,4 +262,4 @@ int main (int argc, char **argv)
 	} /* for (;;) */
 } /* main */
 
-/* $Id: nmeasrv.c,v 1.1 2011/01/23 00:59:40 luis Exp $ */
+/* $Id: nmeasrv.c,v 1.2 2011/01/23 13:11:46 luis Exp $ */
