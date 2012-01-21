@@ -1,4 +1,4 @@
-/* $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $
+/* $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $
  * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
@@ -7,7 +7,10 @@
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
  * $Log: nmeasrv.c,v $
- * Revision 1.4  2012/01/21 18:14:31  luis
+ * Revision 1.5  2012/01/21 20:34:51  luis
+ * Varios cambios para mejorar el aspecto de los logs.
+ *
+ * Revision 1.4  2012-01-21 18:14:31  luis
  * Mejorado el sistema de trazas de mensajes de nmeasrv.c
  * Se ha incluido un mensaje al comienzo cuando se utilizan cualesquiera de
  * las opciones de depurado.
@@ -72,14 +75,14 @@ int n_out = 0;
 
 void do_usage ()
 {
-	fprintf (stderr, "Usage: " PROGNAME " [ options ...]\n");
-	fprintf (stderr, "Options:\n");
-  	fprintf (stderr, "  -i file    Specifies a local filesystem file/device.\n");
-	fprintf (stderr, "  -b ip      Specifies the bind addres to bind to (default: 0.0.0.0)\n");
-	fprintf (stderr, "  -p port    Specifies alternate port to bind.\n");
-	fprintf (stderr, "  -l num     Buffer size to listen(2).\n");
-  	fprintf (stderr, "  -d         Debug. Be verbose.\n");
-  	fprintf (stderr, "  -D         Debug. Trace read/write chunks\n");
+	fprintf(stderr, "Usage: " PROGNAME " [ options ...]\n");
+	fprintf(stderr, "Options:\n");
+  	fprintf(stderr, "  -i file    Specifies a local filesystem file/device.\n");
+	fprintf(stderr, "  -b ip      Specifies the bind addres to bind to (default: 0.0.0.0)\n");
+	fprintf(stderr, "  -p port    Specifies alternate port to bind.\n");
+	fprintf(stderr, "  -l num     Buffer size to listen(2).\n");
+  	fprintf(stderr, "  -d         Debug. Be verbose.\n");
+  	fprintf(stderr, "  -D         Debug. Trace read/write chunks\n");
 	exit (EXIT_SUCCESS);
 } /* do_usage */
 
@@ -95,7 +98,7 @@ int main (int argc, char **argv)
 	for (i = 0; i < MAX; i++) sd_out[i] = NULL;
 
 	/* process the program options... */
-	while ((opt = getopt(argc, argv, "i:b:p:dl:")) != EOF) {
+	while ((opt = getopt(argc, argv, "i:b:p:dDl:")) != EOF) {
 		switch (opt) {
 		case 'i':
 			/* INPUT is selected from a local input file/device.
@@ -118,6 +121,10 @@ int main (int argc, char **argv)
 			/* Debug flag.  It makes program to trace to stderr. */
 			flags |= FLAG_DEBUG;
 			break;
+		case 'D':
+			/* Debug flag.  It makes program to trace to stderr. */
+			flags |= FLAG_DEBUG2;
+			break;
 		case 'l':
 			/* Buffer size to listen. */
 			listen_sz = atoi(optarg);
@@ -130,7 +137,7 @@ int main (int argc, char **argv)
 	} /* while */
 
 	if (flags & (FLAG_DEBUG | FLAG_DEBUG2)) {
-		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $\n");
+		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $\n");
 		fprintf(stderr, PROGNAME": Author: "AUTHOR"\n");
 		fprintf(stderr, PROGNAME": Date compiled: "__DATE__"\n");
 		fprintf(stderr, PROGNAME": COPYRIGHT: "COPYRIGHT"\n");
@@ -154,7 +161,7 @@ int main (int argc, char **argv)
 	/* construct the server part */
 	/* SOCKET */
 	if (flags & FLAG_DEBUG) {
-		fprintf(stderr, "Opening listening socket\n");
+		fprintf(stderr, PROGNAME": Opening listening socket\n");
 	} /* if */
 	sd = socket (AF_INET, SOCK_STREAM, 0);
 	if (sd == -1) {
@@ -164,7 +171,7 @@ int main (int argc, char **argv)
 	} /* if */
 	/* BIND */
 	if (flags & FLAG_DEBUG) {
-		fprintf (stderr, "Trying to bind: [%s:%d]\n",
+		fprintf (stderr, PROGNAME": Trying to bind: [%s:%d]\n",
 			inet_ntoa(our_addr.sin_addr),
 			ntohs (our_addr.sin_port));
 	} /* if */
@@ -176,7 +183,7 @@ int main (int argc, char **argv)
 	} /* if */
 	/* LISTEN */
 	if (flags & FLAG_DEBUG) {
-		fprintf(stderr, "Listening on socket (listen_sz = %d)\n",
+		fprintf(stderr, PROGNAME": Listening on socket (listen_sz = %d)\n",
 			listen_sz);
 	} /* if */
 	res = listen(sd, listen_sz);
@@ -190,14 +197,8 @@ int main (int argc, char **argv)
 	for (;;) {
 		fd_set readset;
 		int sd_max = 0;
-		struct timeval to;
-
 
 		/* prepare the select call... */
-
-		/* TIMEOUT */
-		to.tv_sec = 10;
-		to.tv_usec = 0;
 
 		/* Construct the FD_SET for the select system call */
 		FD_ZERO(&readset);
@@ -220,16 +221,14 @@ int main (int argc, char **argv)
 			} /* if */
 		} /* for */
 
-		res = select (sd_max+1, &readset, NULL, NULL, &to);
+		res = select (sd_max+1, &readset, NULL, NULL, NULL);
 		switch (res) {
 		case -1: /* error in select */
 			fprintf(stderr, PROGNAME ": select: %s (errno = %d)",
 				strerror(errno), errno);
 			exit (EXIT_FAILURE);
 		case 0: /* Timeout */
-			if (flags & FLAG_DEBUG) {
-				fprintf (stderr, PROGNAME ": Timeout\n");
-			} /* if */
+			if (flags & FLAG_DEBUG) fprintf (stderr, PROGNAME ": Timeout\n");
 			continue;
 		default: /* Data on some direction */
 			if (FD_ISSET(sd, &readset)) { /* data in listening socket. */
@@ -381,4 +380,4 @@ int main (int argc, char **argv)
 	} /* for (;;) */
 } /* main */
 
-/* $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $ */
+/* $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $ */
