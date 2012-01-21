@@ -1,8 +1,13 @@
-/* $Id: cliente.c,v 1.5 2011/12/13 10:49:04 luis Exp $
+/* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $
  * Author: Luis Colorado <lc@luiscoloradosistemas.com>
  * Date: Thu Feb 26 12:44:15 MET 1998
  * $Log: cliente.c,v $
- * Revision 1.5  2011/12/13 10:49:04  luis
+ * Revision 1.6  2012/01/21 18:14:31  luis
+ * Mejorado el sistema de trazas de mensajes de nmeasrv.c
+ * Se ha incluido un mensaje al comienzo cuando se utilizan cualesquiera de
+ * las opciones de depurado.
+ *
+ * Revision 1.5  2011-12-13 10:49:04  luis
  * getservbyport devuelve el número de puerto en formato host y no en formato
  * red.  Corregido para contemplar la opción de fallback y el ajuste final en
  * la conexión.
@@ -83,10 +88,10 @@ int main (int argc, char **argv)
 	/* Obtain the server/port info */
 	service = getservbyname (serverport, "tcp");
 	if (!service)
-		service = getservbyport(atoi(serverport), "tcp");
+		service = getservbyport(htons(atoi(serverport)), "tcp");
 	if (!service) {
 		service = &fallback;
-		fallback.s_port = atoi(serverport);
+		fallback.s_port = htons(atoi(serverport));
 	} /* if */
 	host = gethostbyname (servername);
 	if (!host) {
@@ -98,7 +103,7 @@ int main (int argc, char **argv)
 
 	/* Construct the sockaddr_in for the connect system call */
 	server.sin_family = AF_INET;
-	server.sin_port = htons(service->s_port);
+	server.sin_port = service->s_port;
 	server.sin_addr = *(struct in_addr *)(host->h_addr_list[0]);
 
 	if (flags & FLAG_DEBUG) {
@@ -229,4 +234,4 @@ void do_usage ()
 	exit (0);
 } /* do_usage */
 
-/* $Id: cliente.c,v 1.5 2011/12/13 10:49:04 luis Exp $ */
+/* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $ */

@@ -1,4 +1,4 @@
-/* $Id: nmeasrv.c,v 1.3 2012/01/21 16:01:56 luis Exp $
+/* $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $
  * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
@@ -7,7 +7,12 @@
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
  * $Log: nmeasrv.c,v $
- * Revision 1.3  2012/01/21 16:01:56  luis
+ * Revision 1.4  2012/01/21 18:14:31  luis
+ * Mejorado el sistema de trazas de mensajes de nmeasrv.c
+ * Se ha incluido un mensaje al comienzo cuando se utilizan cualesquiera de
+ * las opciones de depurado.
+ *
+ * Revision 1.3  2012-01-21 16:01:56  luis
  * Ya funciona como servidor y cierra la conexion con el GPS cuando se agotan
  * los clientes.
  *
@@ -27,7 +32,9 @@
  */
 
 #define PROGNAME	"nmeasrv"
-#define MAX			2
+#define AUTHOR		"Luis Colorado <lc@luiscoloradosistemas.com>"
+#define COPYRIGHT	"(C) 2012 LUIS COLORADO SISTEMAS S.L.U. ALL RIGHTS RESERVED."
+#define MAX			128
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -48,17 +55,19 @@
 #define FLAG_DEBUG2		2
 #define DEFAULT_LISTEN_SZ	15
 
+struct client_info {
+	int sd;
+	struct sockaddr_in sin;
+};
+
 int flags = 0;
-
 int listen_sz = DEFAULT_LISTEN_SZ;
-
 char *in_filename = NULL;
+char *bind_address = "0.0.0.0";
 char *in_port = "nmeasrv";
 int in_fd = 0;
-
 int sd_bind_socket = -1;
-
-int sd_out[MAX];
+struct client_info *sd_out[MAX];
 int n_out = 0;
 
 void do_usage ()
@@ -66,6 +75,7 @@ void do_usage ()
 	fprintf (stderr, "Usage: " PROGNAME " [ options ...]\n");
 	fprintf (stderr, "Options:\n");
   	fprintf (stderr, "  -i file    Specifies a local filesystem file/device.\n");
+	fprintf (stderr, "  -b ip      Specifies the bind addres to bind to (default: 0.0.0.0)\n");
 	fprintf (stderr, "  -p port    Specifies alternate port to bind.\n");
 	fprintf (stderr, "  -l num     Buffer size to listen(2).\n");
   	fprintf (stderr, "  -d         Debug. Be verbose.\n");
@@ -79,12 +89,13 @@ int main (int argc, char **argv)
 
 	struct sockaddr_in our_addr;
 	struct servent *service;
+	struct hostent *host;
 	int i;
 
-	for (i = 0; i < MAX; i++) sd_out[i] = -1;
+	for (i = 0; i < MAX; i++) sd_out[i] = NULL;
 
 	/* process the program options... */
-	while ((opt = getopt(argc, argv, "i:p:dl:")) != EOF) {
+	while ((opt = getopt(argc, argv, "i:b:p:dl:")) != EOF) {
 		switch (opt) {
 		case 'i':
 			/* INPUT is selected from a local input file/device.
@@ -95,6 +106,9 @@ int main (int argc, char **argv)
 			 in_filename = optarg;
 			 in_fd = -1; /* to initialize input as closed. */
 			 break;
+		case 'b':
+			bind_address = optarg;
+			break;
 		case 'p':
 			/* The parameter to this argument specifies an alternate
 			 * port to listen to for incoming connections. */
@@ -115,6 +129,13 @@ int main (int argc, char **argv)
 		} /* switch */
 	} /* while */
 
+	if (flags & (FLAG_DEBUG | FLAG_DEBUG2)) {
+		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $\n");
+		fprintf(stderr, PROGNAME": Author: "AUTHOR"\n");
+		fprintf(stderr, PROGNAME": Date compiled: "__DATE__"\n");
+		fprintf(stderr, PROGNAME": COPYRIGHT: "COPYRIGHT"\n");
+	} /* if */
+
 	/* Obtain the server/port info */
 	service = getservbyname (in_port, "tcp");
 	if (!service)
@@ -124,6 +145,11 @@ int main (int argc, char **argv)
 	our_addr.sin_family = AF_INET;
 	our_addr.sin_port = (service ? service->s_port : htons(atoi(in_port)));
 	our_addr.sin_addr.s_addr = INADDR_ANY;
+
+	host = gethostbyname(bind_address);
+	if (host) {
+		our_addr.sin_addr = *(struct in_addr *)(host->h_addr_list[0]);
+	} /* if */
 
 	/* construct the server part */
 	/* SOCKET */
@@ -144,7 +170,7 @@ int main (int argc, char **argv)
 	} /* if */
 	res = bind(sd, (const struct sockaddr *)&our_addr, sizeof our_addr);
 	if (res < 0) {
-		fprintf(stderr, PROGNAME ": bind: %s (errno = %d)",
+		fprintf(stderr, PROGNAME ": bind: %s (errno = %d)\n",
 			strerror(errno), errno);
 		exit(EXIT_FAILURE);
 	} /* if */
@@ -188,9 +214,9 @@ int main (int argc, char **argv)
 
 		/* The socket descriptors */
 		for (i = 0; i < MAX; i++) {
-			if (sd_out[i] >= 0) {
-				FD_SET(sd_out[i], &readset);
-				if (sd_out[i] > sd_max) sd_max = sd_out[i];
+			if (sd_out[i]) {
+				FD_SET(sd_out[i]->sd, &readset);
+				if (sd_out[i]->sd > sd_max) sd_max = sd_out[i]->sd;
 			} /* if */
 		} /* for */
 
@@ -213,29 +239,16 @@ int main (int argc, char **argv)
 				if (new_sd < 0) {
 					fprintf(stderr, PROGNAME ": accept: %s (errno = %d)\n",
 						strerror(errno), errno);
-					goto check_in_fd;
+					continue;
 				} /* if */
-				for (i = 0; i < MAX; i++) {
-					if (sd_out[i] < 0) {
-						sd_out[i] = new_sd;
-						break;
-					} /* if */
-				} /* for */
+				for (i = 0; i < MAX; i++) if (!sd_out[i]) break;
 				if (i >= MAX) {
 					fprintf(stderr,
-						PROGNAME ": Connection from %s:%d closed, MAX(%d) reached.\n",
+						PROGNAME ": Connection from [%s:%d] closed, MAX(%d) reached.\n",
 						inet_ntoa(peer.sin_addr),
-						ntohs(peer.sin_port));
+						ntohs(peer.sin_port), MAX);
 					close(new_sd);
-					goto check_in_fd;
-				} /* if */
-				n_out++;
-				if (flags & FLAG_DEBUG) {
-					fprintf(stderr,
-						PROGNAME ": New connection from %s:%d (slot %d, sd %d)\n",
-						inet_ntoa(peer.sin_addr),
-						ntohs(peer.sin_port),
-						i, sd_out[i]);
+					continue;
 				} /* if */
 				/* If in_fd < 0 we have to open the in port */
 				if (in_fd < 0) {
@@ -246,48 +259,68 @@ int main (int argc, char **argv)
 					} /* if */
 					in_fd = open(in_filename, O_RDONLY);
 					if (in_fd < 0) {
-						fprintf(stderr, PROGNAME ": open: %s (errno = %d)\n",
-							strerror(errno), errno);
+						fprintf(stderr, PROGNAME ": open: %s: %s (errno = %d). Closing new_sd(%d).\n",
+							in_filename, strerror(errno), errno, new_sd);
+						close(new_sd);
 						sleep(1);
+						continue;
 					} /* if */
-					goto check_out_sd;
+				} /* if */
+				n_out++;
+				sd_out[i] = malloc(sizeof(struct client_info));
+				sd_out[i]->sd = new_sd;
+				sd_out[i]->sin = peer;
+				if (flags & FLAG_DEBUG) {
+					fprintf(stderr,
+						PROGNAME ": New connection from [%s:%d]: slot %d, sd %d\n",
+						inet_ntoa(sd_out[i]->sin.sin_addr),
+						ntohs(sd_out[i]->sin.sin_port),
+						i, sd_out[i]->sd);
 				} /* if */
 			} /* if */
-check_in_fd:
 			if ((in_fd >= 0) && FD_ISSET(in_fd, &readset)) {
 				static char buffer [1024];
 				int n = read(in_fd, buffer, sizeof buffer);
 				switch (n) {
 				case -1: /* ERROR */
-					fprintf(stderr, PROGNAME ": read(in_fd=%d): %s (errno = %d)\n",
+					fprintf(stderr, PROGNAME ": read(%s, in_fd=%d): %s (errno = %d)\n",
+						in_fd ? in_filename : "<stdin>",
 						in_fd, strerror(errno), errno);
 					close(in_fd); in_fd = -1;
 					break;
 				case 0: /* EOF */
-					fprintf(stderr, PROGNAME ": read(in_fd=%d): EOF\n", in_fd);
+					fprintf(stderr, PROGNAME ": read(%s, in_fd=%d): EOF\n",
+						in_fd ? in_filename : "<stdin>", in_fd);
 					close(in_fd); in_fd = -1;
-					break;
+					for (i = 0; i < MAX; i++) {
+						if (sd_out[i]) {
+							close(sd_out[i]->sd);
+							free(sd_out[i]);
+							sd_out[i] = NULL;
+						} /* if */
+					} /* for */
+					continue;
 				default:
 					if (flags & FLAG_DEBUG2) {
-						fprintf(stderr, " [%d]", n);
+						fprintf(stderr, " [fd=%d, read=%d]", in_fd, n);
 					} /* if */
 					for (i = 0; i < MAX; i++) {
-						if (sd_out[i] >= 0) {
-							int res = write(sd_out[i], buffer, n);
+						if (sd_out[i]) {
+							int res = write(sd_out[i]->sd, buffer, n);
 							if (res != n) {
 								if (flags & FLAG_DEBUG) {
 									fprintf(stderr,
-										PROGNAME ": connection closed (slot %d, sd_out=%d): res(%d) != n(%d)\n",
-										i, sd_out[i], res, n);
+										PROGNAME ": Closing connection to [%s:%d]: write: slot %d, fd=%d: (res(%d) != n(%d))\n",
+										inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+										i, sd_out[i]->sd, res, n);
 								} /* if */
-								close(sd_out[i]); sd_out[i] = -1;
+								close(sd_out[i]->sd); free(sd_out[i]); sd_out[i] = NULL;
 								n_out--;
 								if ((n_out == 0) && (in_fd > 0)) {
 									if (flags & FLAG_DEBUG) {
 										fprintf(stderr,
-											PROGNAME ": closing input file %s at descriptor %d, as no clients are connected\n",
-											in_filename,
-											in_fd);
+											PROGNAME ": Closing input file %s fd=%d: No clients are connected\n",
+											in_filename, in_fd);
 									} /* if */
 									close(in_fd); in_fd = -1;
 								} /* if */
@@ -296,21 +329,21 @@ check_in_fd:
 					} /* for */
 				} /* switch */
 			} /* if */
-check_out_sd:
 			for (i = 0; i < MAX; i++) {
-				if ((sd_out[i] >= 0) && FD_ISSET(sd_out[i], &readset)) {
+				if (sd_out[i] && FD_ISSET(sd_out[i]->sd, &readset)) {
 					char buffer[1024];
-					int r = read(sd_out[i], buffer, sizeof buffer);
+					int r = read(sd_out[i]->sd, buffer, sizeof buffer);
 					switch (r) {
 					case -1:
-						fprintf(stderr, PROGNAME ": read(sd_out[%d]=%d): %s (errno = %d)\n",
-							i, sd_out[i], strerror(errno), errno);
-						close(sd_out[i]); sd_out[i] = -1;
+						fprintf(stderr, PROGNAME ": Closing connection to [%s:%d]: read: slot=%d, fd=%d: %s (errno = %d)\n",
+							inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+							i, sd_out[i]->sd, strerror(errno), errno);
+						close(sd_out[i]->sd); free(sd_out[i]); sd_out[i] = NULL;
 						n_out--;
 						if ((n_out == 0) && (in_fd > 0)) {
 							if (flags & FLAG_DEBUG) {
 								fprintf(stderr,
-									PROGNAME ": closing input file %s at descriptor %d, as no clients are connected\n",
+									PROGNAME ": Closing input file %s fd=%d: No clients are connected\n",
 									in_filename, in_fd);
 							} /* if */
 							close (in_fd); in_fd = -1;
@@ -318,23 +351,26 @@ check_out_sd:
 						break;
 					case 0:
 						if (flags & FLAG_DEBUG) {
-							fprintf(stderr, PROGNAME ": read(sd_out[%d]=%d): EOF\n", i, sd_out[i]);
+							fprintf(stderr, PROGNAME ": Closing connection to [%s:%d]: read: slot=%d, fd=%d: EOF\n",
+								inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+								i, sd_out[i]->sd);
 						} /* if */
-						close(sd_out[i]); sd_out[i] = -1;
+						close(sd_out[i]->sd); free(sd_out[i]); sd_out[i] = NULL;
 						n_out--;
 						if ((n_out == 0) && (in_fd > 0)) {
 							if (flags & FLAG_DEBUG) {
 								fprintf(stderr,
-									PROGNAME ": closing input file %s at descriptor %d, as no clients are connected\n",
+									PROGNAME ": Closing input file %s fd=%d: No clients are connected\n",
 									in_filename, in_fd);
 							} /* if */
-							close (in_fd);
-							in_fd = -1;
+							close (in_fd); in_fd = -1;
 						} /* if */
 						break;
 					default:
 						if (flags & FLAG_DEBUG2) {
-							fprintf(stderr, " <sd_out[%d]=%d: n=%d>", i, sd_out[i], r);
+							fprintf(stderr, " <[%s:%d]: slot=%d, fd=%d: read=%d>",
+								inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+								i, sd_out[i]->sd, r);
 						} /* if */
 						break;
 					} /* switch */
@@ -345,4 +381,4 @@ check_out_sd:
 	} /* for (;;) */
 } /* main */
 
-/* $Id: nmeasrv.c,v 1.3 2012/01/21 16:01:56 luis Exp $ */
+/* $Id: nmeasrv.c,v 1.4 2012/01/21 18:14:31 luis Exp $ */
