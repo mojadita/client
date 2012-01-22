@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: winsvc.sh,v 1.3 2012/01/22 16:45:56 luis Exp $
+# $Id: winsvc.sh,v 1.4 2012/01/22 16:46:25 luis Exp $
 # Author: Luis Colorado <lc@luiscoloradosistemas.com>
 # Date: Fri Jan 20 23:00:06     2012
 # Disclaimer: (C) 2012 LUIS COLORADO SISTEMAS S.L.U.
@@ -11,7 +11,7 @@ PORT=1234
 exec cygrunsrv \
 	--install=NMEASRV \
 	--path=/home/luis/cliente/nmeasrv \
-	--args="-i ${TTY} -p ${PORT}" \
+	--args="-i ${TTY} -p ${PORT} -d" \
 	--chdir=/home/luis \
 	--stdin=/dev/null \
 	--stdout=/dev/null \
@@ -20,4 +20,4 @@ exec cygrunsrv \
 	--disp="NMEA Service (${TTY} -> ${PORT})" \
 	--type="auto"
 
-# $Id: winsvc.sh,v 1.3 2012/01/22 16:45:56 luis Exp $
+# $Id: winsvc.sh,v 1.4 2012/01/22 16:46:25 luis Exp $
