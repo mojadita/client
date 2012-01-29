@@ -1,4 +1,4 @@
-/* $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $
+/* $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $
  * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
@@ -7,7 +7,13 @@
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
  * $Log: nmeasrv.c,v $
- * Revision 1.5  2012/01/21 20:34:51  luis
+ * Revision 1.6  2012/01/29 11:26:23  luis
+ * algunas trazas no estaba correctamente puestas (faltaba el chequeo de una
+ * de ellas frente a FLAG_DEBUG y faltaba una traza completa, cuando se cierra
+ * el fichero de entrada debido a un EOF, que han de cerrarse todas las
+ * conexiones)
+ *
+ * Revision 1.5  2012-01-21 20:34:51  luis
  * Varios cambios para mejorar el aspecto de los logs.
  *
  * Revision 1.4  2012-01-21 18:14:31  luis
@@ -137,7 +143,7 @@ int main (int argc, char **argv)
 	} /* while */
 
 	if (flags & (FLAG_DEBUG | FLAG_DEBUG2)) {
-		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $\n");
+		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $\n");
 		fprintf(stderr, PROGNAME": Author: "AUTHOR"\n");
 		fprintf(stderr, PROGNAME": Date compiled: "__DATE__"\n");
 		fprintf(stderr, PROGNAME": COPYRIGHT: "COPYRIGHT"\n");
@@ -288,11 +294,20 @@ int main (int argc, char **argv)
 					close(in_fd); in_fd = -1;
 					break;
 				case 0: /* EOF */
-					fprintf(stderr, PROGNAME ": read(%s, in_fd=%d): EOF\n",
-						in_fd ? in_filename : "<stdin>", in_fd);
+					if (flags & FLAG_DEBUG) {
+						fprintf(stderr, PROGNAME ": read(%s, in_fd=%d): EOF\n",
+							in_fd ? in_filename : "<stdin>", in_fd);
+					} /* if */
 					close(in_fd); in_fd = -1;
 					for (i = 0; i < MAX; i++) {
 						if (sd_out[i]) {
+							if (flags & FLAG_DEBUG) {
+								fprintf(stderr, PROGNAME 
+									": Closing connection to [%s:%d]: slot %d, "
+									"fd=%d: input file closed\n",
+									inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+									i, sd_out[i]->sd);
+							} /* if */
 							close(sd_out[i]->sd);
 							free(sd_out[i]);
 							sd_out[i] = NULL;
@@ -380,4 +395,4 @@ int main (int argc, char **argv)
 	} /* for (;;) */
 } /* main */
 
-/* $Id: nmeasrv.c,v 1.5 2012/01/21 20:34:51 luis Exp $ */
+/* $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $ */
