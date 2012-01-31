@@ -1,4 +1,4 @@
-/* $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $
+/* $Id: nmeasrv.c,v 1.7 2012/01/31 21:22:47 luis Exp $
  * Author: Luis Colorado <luis.colorado@hispalinux.es>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
@@ -7,7 +7,18 @@
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
  * $Log: nmeasrv.c,v $
- * Revision 1.6  2012/01/29 11:26:23  luis
+ * Revision 1.7  2012/01/31 21:22:47  luis
+ * * Se imprime el número del puerto asignado por el sistema y se imprime,
+ *   en el caso de que no se configure un puerto de escucha.
+ * * Se ha cambiado la traza que imprime la apertura del canal de entrada
+ *   para que imprima también el descriptor de fichero obtenido.
+ * * Se ha corregido el código para que no se cierre/abra el canal de entrada
+ *   cuando este está asignado a la entrada estandar (cuando no se ha
+ *   utilizado la opción -i)
+ * * Se ha cambiado el puerto de lectura por /dev/ttyS15 y el puerto de
+ *   escucha por defecto el 23456 en el script que crea el servicio windows.
+ *
+ * Revision 1.6  2012-01-29 11:26:23  luis
  * algunas trazas no estaba correctamente puestas (faltaba el chequeo de una
  * de ellas frente a FLAG_DEBUG y faltaba una traza completa, cuando se cierra
  * el fichero de entrada debido a un EOF, que han de cerrarse todas las
@@ -143,7 +154,7 @@ int main (int argc, char **argv)
 	} /* while */
 
 	if (flags & (FLAG_DEBUG | FLAG_DEBUG2)) {
-		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $\n");
+		fprintf(stderr, PROGNAME": $Id: nmeasrv.c,v 1.7 2012/01/31 21:22:47 luis Exp $\n");
 		fprintf(stderr, PROGNAME": Author: "AUTHOR"\n");
 		fprintf(stderr, PROGNAME": Date compiled: "__DATE__"\n");
 		fprintf(stderr, PROGNAME": COPYRIGHT: "COPYRIGHT"\n");
@@ -186,6 +197,20 @@ int main (int argc, char **argv)
 		fprintf(stderr, PROGNAME ": bind: %s (errno = %d)\n",
 			strerror(errno), errno);
 		exit(EXIT_FAILURE);
+	} /* if */
+	if (ntohs(our_addr.sin_port) == 0) {
+		struct sockaddr_in new_addr;
+		int sz = sizeof new_addr;
+		int res;
+		res = getsockname(sd, (struct sockaddr *)&new_addr, &sz);
+		if (res < 0) {
+			fprintf(stderr, PROGNAME": getsockname: %s (errno = %d)\n",
+				strerror(errno), errno);
+		} else {
+			fprintf(stderr, PROGNAME ": bound to [%s:%d]\n",
+				inet_ntoa(new_addr.sin_addr),
+				ntohs(new_addr.sin_port));
+		} /* if */
 	} /* if */
 	/* LISTEN */
 	if (flags & FLAG_DEBUG) {
@@ -257,11 +282,6 @@ int main (int argc, char **argv)
 				} /* if */
 				/* If in_fd < 0 we have to open the in port */
 				if (in_fd < 0) {
-					if (flags & FLAG_DEBUG) {
-						fprintf(stderr,
-							PROGNAME ": opening %s for input\n",
-							in_filename);
-					} /* if */
 					in_fd = open(in_filename, O_RDONLY);
 					if (in_fd < 0) {
 						fprintf(stderr, PROGNAME ": open: %s: %s (errno = %d). Closing new_sd(%d).\n",
@@ -269,6 +289,11 @@ int main (int argc, char **argv)
 						close(new_sd);
 						sleep(1);
 						continue;
+					} /* if */
+					if (flags & FLAG_DEBUG) {
+						fprintf(stderr,
+							PROGNAME ": opening %s for input as in_fd=%d\n",
+							in_filename, in_fd);
 					} /* if */
 				} /* if */
 				n_out++;
@@ -298,21 +323,23 @@ int main (int argc, char **argv)
 						fprintf(stderr, PROGNAME ": read(%s, in_fd=%d): EOF\n",
 							in_fd ? in_filename : "<stdin>", in_fd);
 					} /* if */
-					close(in_fd); in_fd = -1;
-					for (i = 0; i < MAX; i++) {
-						if (sd_out[i]) {
-							if (flags & FLAG_DEBUG) {
-								fprintf(stderr, PROGNAME 
-									": Closing connection to [%s:%d]: slot %d, "
-									"fd=%d: input file closed\n",
-									inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
-									i, sd_out[i]->sd);
+					if (in_fd > 0) { /* don't close stdin */
+						close(in_fd); in_fd = -1;
+						for (i = 0; i < MAX; i++) {
+							if (sd_out[i]) {
+								if (flags & FLAG_DEBUG) {
+									fprintf(stderr, PROGNAME 
+										": Closing connection to [%s:%d]: slot %d, "
+										"fd=%d: input file closed\n",
+										inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
+										i, sd_out[i]->sd);
+								} /* if */
+								close(sd_out[i]->sd);
+								free(sd_out[i]);
+								sd_out[i] = NULL;
 							} /* if */
-							close(sd_out[i]->sd);
-							free(sd_out[i]);
-							sd_out[i] = NULL;
-						} /* if */
-					} /* for */
+						} /* for */
+					} /* if */
 					continue;
 				default:
 					if (flags & FLAG_DEBUG2) {
@@ -395,4 +422,4 @@ int main (int argc, char **argv)
 	} /* for (;;) */
 } /* main */
 
-/* $Id: nmeasrv.c,v 1.6 2012/01/29 11:26:23 luis Exp $ */
+/* $Id: nmeasrv.c,v 1.7 2012/01/31 21:22:47 luis Exp $ */
