@@ -1,32 +1,33 @@
 /* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $
  * Author: Luis Colorado <lc@luiscoloradosistemas.com>
  * Date: Thu Feb 26 12:44:15 MET 1998
- * $Log: cliente.c,v $
- * Revision 1.6  2012/01/21 18:14:31  luis
- * Mejorado el sistema de trazas de mensajes de nmeasrv.c
- * Se ha incluido un mensaje al comienzo cuando se utilizan cualesquiera de
- * las opciones de depurado.
  *
- * Revision 1.5  2011-12-13 10:49:04  luis
- * getservbyport devuelve el número de puerto en formato host y no en formato
- * red.  Corregido para contemplar la opción de fallback y el ajuste final en
- * la conexión.
+ * Copyright (c) 1998-2017 by LUIS COLORADO
+ * All rights reserved.
  *
- * Revision 1.4  2011-01-23 00:59:39  luis
- * * Changed author email in cliente.c
- * * Added comments on closing braces to pair the control sentence.
- * * Added nmeasrv.c as an example of server listening for connections on
- *   a specific port.  Doesn't work well when specifying input file yet.
+ * This software was developed by LUIS COLORADO
  *
- * Revision 1.3  2000-07-16 23:58:18  luis
- * Change in the email address of the author.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 
+ * 1. Redistributions of source code MUST retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form MUST reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * Revision 1.2  1998/04/04 11:45:36  luis
- * Included options to check individually for EOF on connection/local sides
- *
- * Revision 1.1  1998/02/26 19:31:07  luis
- * Initial revision
- *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 #define DEFAULT_SERVER "127.0.0.1"
@@ -49,12 +50,12 @@
 extern char *optarg;
 extern int optind, opterr, optopt;
 
-#define FLAG_DEBUG	1
-#define FLAG_EOFSTDIN	2
-#define FLAG_EOFSOCKET	4
-#define FLAG_EOFALL	6
-#define FLAG_OPTEOFLOCL	8
-#define FLAG_OPTEOFCONN 16
+#define FLAG_DEBUG      (1 << 0)
+#define FLAG_EOFSTDIN	(1 << 1)
+#define FLAG_EOFSOCKET	(1 << 2)
+#define FLAG_EOFALL     (FLAG_EOFSTDIN || FLAG_EOFSOCKET)
+#define FLAG_OPTEOFLOCL	(1 << 3)
+#define FLAG_OPTEOFCONN (1 << 4)
 
 int flags = 0;
 
@@ -159,6 +160,7 @@ int main (int argc, char **argv)
 							PROGNAME
 							": stdin EOF\n");
 					} /* if */
+                    shutdown(sd, SHUT_WR);
 					if (flags & FLAG_OPTEOFLOCL) {
 					  if (flags & FLAG_DEBUG) {
 					    fprintf (stderr,
@@ -177,6 +179,7 @@ int main (int argc, char **argv)
 							PROGNAME
 							": socket EOF\n");
 					} /* if */
+                    shutdown(sd, SHUT_RD);
 					if (flags & FLAG_OPTEOFCONN) {
 					  if (flags & FLAG_DEBUG) {
 					    fprintf (stderr,
