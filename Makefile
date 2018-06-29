@@ -6,20 +6,11 @@
 # DISCLAIMER: (C) 2012 LUIS COLORADO SISTEMAS S.L.U.
 #             ALL RIGHTS RESERVED.
 
-TARGETS=cliente nmeasrv
+TARGETS=cliente nmeasrv srv
 
 .PHONY: all clean
 all: $(TARGETS)
 clean:
-	$(RM) $(TARGETS) $(cliente_objs) $(nmeasrv_objs)
-
-cliente_objs=cliente.o
-nmeasrv_objs=nmeasrv.o
-
-cliente: $(cliente_objs)
-	$(CC) $(LDFLAGS) -o cliente $(cliente_objs)
-
-nmeasrv: $(nmeasrv_objs)
-	$(CC) $(LDFLAGS) -o nmeasrv $(nmeasrv_objs)
+	$(RM) $(TARGETS) 
 
 # $Id: Makefile,v 1.1 2012/01/21 13:38:38 luis Exp $
