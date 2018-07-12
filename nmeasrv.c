@@ -1,54 +1,11 @@
 /* $Id: nmeasrv.c,v 1.7 2012/01/31 21:22:47 luis Exp $
- * Author: Luis Colorado <luis.colorado@hispalinux.es>
+ * Author: Luis Colorado <luiscoloradourcola@gmail.com>
  * Date: Sat Jan 22 12:23:02     2011
  * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
  *		All rights reserved.
  * Description: This program binds to a default port (or
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.
- * $Log: nmeasrv.c,v $
- * Revision 1.7  2012/01/31 21:22:47  luis
- * * Se imprime el número del puerto asignado por el sistema y se imprime,
- *   en el caso de que no se configure un puerto de escucha.
- * * Se ha cambiado la traza que imprime la apertura del canal de entrada
- *   para que imprima también el descriptor de fichero obtenido.
- * * Se ha corregido el código para que no se cierre/abra el canal de entrada
- *   cuando este está asignado a la entrada estandar (cuando no se ha
- *   utilizado la opción -i)
- * * Se ha cambiado el puerto de lectura por /dev/ttyS15 y el puerto de
- *   escucha por defecto el 23456 en el script que crea el servicio windows.
- *
- * Revision 1.6  2012-01-29 11:26:23  luis
- * algunas trazas no estaba correctamente puestas (faltaba el chequeo de una
- * de ellas frente a FLAG_DEBUG y faltaba una traza completa, cuando se cierra
- * el fichero de entrada debido a un EOF, que han de cerrarse todas las
- * conexiones)
- *
- * Revision 1.5  2012-01-21 20:34:51  luis
- * Varios cambios para mejorar el aspecto de los logs.
- *
- * Revision 1.4  2012-01-21 18:14:31  luis
- * Mejorado el sistema de trazas de mensajes de nmeasrv.c
- * Se ha incluido un mensaje al comienzo cuando se utilizan cualesquiera de
- * las opciones de depurado.
- *
- * Revision 1.3  2012-01-21 16:01:56  luis
- * Ya funciona como servidor y cierra la conexion con el GPS cuando se agotan
- * los clientes.
- *
- * Revision 1.2  2011-01-23 13:11:46  luis
- * * input device is open only in presence of connections, closed otherwise
- *   (except if input is from stdin, which is not closed).
- * * corrected an error with 'flags' being used for two conflicting variables.
- * * Traffic log consists now in only the number of bytes between square
- *   brackets.
- *
- * Revision 1.1  2011-01-23 00:59:40  luis
- * * Changed author email in cliente.c
- * * Added comments on closing braces to pair the control sentence.
- * * Added nmeasrv.c as an example of server listening for connections on
- *   a specific port.  Doesn't work well when specifying input file yet.
- *
  */
 
 #define PROGNAME	"nmeasrv"
@@ -85,7 +42,8 @@ int listen_sz = DEFAULT_LISTEN_SZ;
 char *in_filename = NULL;
 char *bind_address = "0.0.0.0";
 char *in_port = "nmeasrv";
-int in_fd = 0;
+int in_fd = 0; /* stdin */
+int out_fd = 1; /* stdout */
 int sd_bind_socket = -1;
 struct client_info *sd_out[MAX];
 int n_out = 0;
@@ -125,6 +83,7 @@ int main (int argc, char **argv)
 			 * doesn't fail. */
 			 in_filename = optarg;
 			 in_fd = -1; /* to initialize input as closed. */
+             out_fd = -1;
 			 break;
 		case 'b':
 			bind_address = optarg;
@@ -186,6 +145,7 @@ int main (int argc, char **argv)
 			strerror(errno), errno);
 		exit(EXIT_FAILURE);
 	} /* if */
+
 	/* BIND */
 	if (flags & FLAG_DEBUG) {
 		fprintf (stderr, PROGNAME": Trying to bind: [%s:%d]\n",
@@ -212,6 +172,7 @@ int main (int argc, char **argv)
 				ntohs(new_addr.sin_port));
 		} /* if */
 	} /* if */
+
 	/* LISTEN */
 	if (flags & FLAG_DEBUG) {
 		fprintf(stderr, PROGNAME": Listening on socket (listen_sz = %d)\n",
@@ -282,7 +243,7 @@ int main (int argc, char **argv)
 				} /* if */
 				/* If in_fd < 0 we have to open the in port */
 				if (in_fd < 0) {
-					in_fd = open(in_filename, O_RDONLY);
+					out_fd = in_fd = open(in_filename, O_RDONLY);
 					if (in_fd < 0) {
 						fprintf(stderr, PROGNAME ": open: %s: %s (errno = %d). Closing new_sd(%d).\n",
 							in_filename, strerror(errno), errno, new_sd);
@@ -375,7 +336,7 @@ int main (int argc, char **argv)
 					char buffer[1024];
 					int r = read(sd_out[i]->sd, buffer, sizeof buffer);
 					switch (r) {
-					case -1:
+					case -1: /* read error */
 						fprintf(stderr, PROGNAME ": Closing connection to [%s:%d]: read: slot=%d, fd=%d: %s (errno = %d)\n",
 							inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
 							i, sd_out[i]->sd, strerror(errno), errno);
@@ -390,7 +351,7 @@ int main (int argc, char **argv)
 							close (in_fd); in_fd = -1;
 						} /* if */
 						break;
-					case 0:
+					case 0: /* EOF on input */
 						if (flags & FLAG_DEBUG) {
 							fprintf(stderr, PROGNAME ": Closing connection to [%s:%d]: read: slot=%d, fd=%d: EOF\n",
 								inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
@@ -413,6 +374,10 @@ int main (int argc, char **argv)
 								inet_ntoa(sd_out[i]->sin.sin_addr), ntohs(sd_out[i]->sin.sin_port),
 								i, sd_out[i]->sd, r);
 						} /* if */
+                        if (out_fd >= 0) {
+                            /* only one attempt, for now */
+                            write(out_fd, buffer, r);
+                        }
 						break;
 					} /* switch */
 				} /* if */
