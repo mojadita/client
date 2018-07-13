@@ -22,6 +22,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -160,7 +161,7 @@ int main (int argc, char **argv)
 	} /* if */
 	if (ntohs(our_addr.sin_port) == 0) {
 		struct sockaddr_in new_addr;
-		int sz = sizeof new_addr;
+		socklen_t sz = sizeof new_addr;
 		int res;
 		res = getsockname(sd, (struct sockaddr *)&new_addr, &sz);
 		if (res < 0) {
@@ -225,7 +226,7 @@ int main (int argc, char **argv)
 		default: /* Data on some direction */
 			if (FD_ISSET(sd, &readset)) { /* data in listening socket. */
 				struct sockaddr_in peer;
-				int peer_sz = sizeof peer;
+				socklen_t peer_sz = sizeof peer;
 				int new_sd = accept(sd, (struct sockaddr *)&peer, &peer_sz);
 				if (new_sd < 0) {
 					fprintf(stderr, PROGNAME ": accept: %s (errno = %d)\n",

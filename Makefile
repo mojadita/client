@@ -8,6 +8,8 @@
 
 TARGETS=cliente nmeasrv srv
 
+RM		?= rm -f
+
 .PHONY: all clean
 all: $(TARGETS)
 clean:

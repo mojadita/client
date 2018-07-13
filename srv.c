@@ -69,7 +69,7 @@ int main (int argc, char **argv)
         }
         {
             struct sockaddr_in server;
-            int server_sz = sizeof server;
+            socklen_t server_sz = sizeof server;
             int res = getsockname(sd,
                     (struct sockaddr *) &server,
                     &server_sz);
@@ -78,7 +78,7 @@ int main (int argc, char **argv)
         }
 
         struct sockaddr_in client;
-        int client_sz = sizeof client;
+        socklen_t client_sz = sizeof client;
         int cd = accept(sd,
                 (struct sockaddr *)&client,
                 &client_sz);
@@ -105,7 +105,7 @@ int main (int argc, char **argv)
         ssize_t n;
 
         while ((n = read(cd, buffer, sizeof buffer)) > 0) {
-            printf("Recibido: [%.*s]\n", n, buffer);
+            printf("Recibido: [%.*s]\n", (int)n, buffer);
             write(cd, buffer, n);
         } /* while */
         if(n < 0) {
