@@ -75,6 +75,8 @@ struct process proc[] = {
 
 struct process *proc_end = (struct process *)(&proc + 1);
 
+FILE *logger;
+
 int main (int argc, char **argv)
 {
 	int opt;
@@ -93,14 +95,26 @@ int main (int argc, char **argv)
 		prog_name = argv[0];
 	}
 
+	logger = stderr;
+
 	/* process the program options... */
-	while ((opt = getopt(argc, argv, "h:p:dt:cl")) != EOF) {
+	while ((opt = getopt(argc, argv, "h:p:dt:l:")) != EOF) {
 		switch (opt) {
 		case 'p':  serverport = optarg; break;
 		case 'h':  servername = optarg; break;
 		case 'd':  flags |= FLAG_DEBUG; break;
 		case 't':  to = abs(atoi(optarg)); break;
-		default: do_usage(argv[0]);
+		case 'l':  logger = fopen(optarg, "wt");
+					if (!logger) {
+						logger = stderr;
+						ERR(EXIT_FAILURE,
+							"%s: %s (ERR %d)\n",
+							optarg,
+							strerror(errno), errno);	
+					}
+					setbuf(logger, NULL);
+					break;
+		default: do_usage(argv[0]); break;
 		} /* switch */
 	} /* while */
 

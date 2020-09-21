@@ -34,7 +34,7 @@ int process (struct process *proc)
 	default: /* WE HAVE DATA, SO WRITE IT TO fd_out */
 
 		if (flags & FLAG_DEBUG) {
-			fprintbuf(stderr,
+			fprintbuf(logger,
 				proc->offset,
 				tam, buffer,
 				"%s (%d bytes)", proc->messg, tam);

@@ -12,19 +12,21 @@
 #define F(_fmt) __FILE__":%d:%s: "_fmt,__LINE__,__func__
 
 #define WARN(_fmt, ...) do {								\
-		fprintf(stderr, F(" WARN:"_fmt),##__VA_ARGS__);	\
+		fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);	\
 	} while(0)
 
 #define INFO(_fmt, ...) do {								\
-		fprintf(stderr, F(" INFO:"_fmt),##__VA_ARGS__);	\
+		fprintf(logger, F(" INFO:"_fmt),##__VA_ARGS__);	\
 	} while(0)
 
 #define ERR(_code, _fmt, ...) do {							\
-		fprintf(stderr, F("ERROR: "_fmt),					\
+		fprintf(logger, F("ERROR: "_fmt),					\
 			##__VA_ARGS__);									\
 		exit(_code);										\
 	} while(0)
 
 extern int flags; /* the configuration flags are known everywhere */
+
+extern FILE *logger;
 
 #endif /* _MAIN_H */
