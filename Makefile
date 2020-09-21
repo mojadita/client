@@ -25,3 +25,4 @@ cliente: $(cliente_objs)
 	$(CC) $(LDFLAGS) -o $@ $(cliente_objs)
 
 # $Id: Makefile,v 1.1 2012/01/21 13:38:38 luis Exp $
+#include .depend

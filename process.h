@@ -10,7 +10,6 @@
 /* process info, one per direction */
 struct process {
 	int fd_in, fd_out;
-	int flag_eof;
 	int at_eof;
 	off_t offset;
 	char *from;

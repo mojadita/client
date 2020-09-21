@@ -8,10 +8,6 @@
 #define _MAIN_H
 
 #define FLAG_DEBUG      (1 << 0)
-#define FLAG_OPTEOFLOCL	(1 << 1)
-#define FLAG_OPTEOFCONN (1 << 2)
-#define FLAG_EOFLOCL	(1 << 3)
-#define FLAG_EOFREM		(1 << 4)
 
 #define F(_fmt) __FILE__":%d:%s: "_fmt,__LINE__,__func__
 

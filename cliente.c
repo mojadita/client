@@ -57,7 +57,6 @@ int flags = 0;
 struct process proc[] = {
 	{	.fd_in        =  0,
 		.fd_out       = -1,
-		.flag_eof     = FLAG_OPTEOFLOCL,
 		.at_eof       =  0,
 		.offset       =  0L,
 	 	.from         = "STDIN",
@@ -66,7 +65,6 @@ struct process proc[] = {
 	},{
 		.fd_in        = -1,
 		.fd_out       =  1,
-		.flag_eof     = FLAG_OPTEOFCONN,
 		.at_eof       =  0,
 		.offset       =  0L,
 		.from         = "SOCKET",
@@ -102,8 +100,6 @@ int main (int argc, char **argv)
 		case 'h':  servername = optarg; break;
 		case 'd':  flags |= FLAG_DEBUG; break;
 		case 't':  to = abs(atoi(optarg)); break;
-		case 'l':  flags |= FLAG_OPTEOFLOCL; break;
-		case 'c':  flags |= FLAG_OPTEOFCONN; break;
 		default: do_usage(argv[0]);
 		} /* switch */
 	} /* while */
@@ -144,7 +140,8 @@ int main (int argc, char **argv)
 	int res = connect(sd,
 			(struct sockaddr *)&server, sizeof server);
 	if (res < 0) {
-		ERR(EXIT_FAILURE, "connect: %s (ERR %d)\n",
+		ERR(EXIT_FAILURE, "connect: %s:%d %s (ERR %d)\n",
+			inet_ntoa(server.sin_addr), ntohs(server.sin_port),
 			strerror(errno), errno);
 	} /* if */
 
