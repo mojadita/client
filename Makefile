@@ -7,15 +7,17 @@
 #             ALL RIGHTS RESERVED.
 
 TARGETS=cliente nmeasrv srv
+TOCLEAN=$(TARGETS)
 
 RM		?= rm -f
 
 .PHONY: all clean
 all: $(TARGETS)
 clean:
-	$(RM) $(TARGETS) 
+	$(RM) $(TOCLEAN) 
 
-cliente_objs = cliente.o fprintbuf.o
+cliente_objs = cliente.o fprintbuf.o process.o usage.o
+TOCLEAN += $(cliente_objs)
 
 cliente: $(cliente_objs)
 	$(CC) $(LDFLAGS) -o $@ $(cliente_objs)

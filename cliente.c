@@ -46,42 +46,36 @@
 #include <unistd.h>
 
 #include "main.h"
+#include "usage.h"
 #include "process.h"
 
 #define DEFAULT_SERVER		"127.0.0.1"
 #define DEFAULT_SERVICE		"telnet"
-#define PROGNAME			"cliente"
-
-#define FLAG_DEBUG      (1 << 0)
-#define FLAG_OPTEOFLOCL	(1 << 1)
-#define FLAG_OPTEOFCONN (1 << 2)
 
 int flags = 0;
 
-#define N				(2)
-
-struct process proc[N] = {
+struct process proc[] = {
 	{	.fd_in        =  0,
 		.fd_out       = -1,
 		.flag_eof     = FLAG_OPTEOFLOCL,
+		.at_eof       =  0,
 		.offset       =  0L,
 	 	.from         = "STDIN",
-		.messg        = ">>> OUTPUT TO SOCKET",
-		.what_to_shut = SHUT_WR,
+		.messg        = "\033[1;33m>>> OUTPUT TO SOCKET\033[m",
+		.do_shutdown  = 1,
 	},{
 		.fd_in        = -1,
 		.fd_out       =  1,
 		.flag_eof     = FLAG_OPTEOFCONN,
+		.at_eof       =  0,
 		.offset       =  0L,
 		.from         = "SOCKET",
-		.messg        = "<<< INPUT FROM SOCKET",
-		.what_to_shut = SHUT_RD,
+		.messg        = "\033[1;32m<<< INPUT FROM SOCKET\033[m",
+		.do_shutdown  = 0,
 	},
 };
 
-struct process *proc_end = proc + N;
-
-void do_usage (void);
+struct process *proc_end = (struct process *)(&proc + 1);
 
 int main (int argc, char **argv)
 {
@@ -93,8 +87,15 @@ int main (int argc, char **argv)
 	char *serverport = DEFAULT_SERVICE;
 	struct process *p;
 
-	static struct timeval timeout = { 0, 0 },
-		*t;
+	char *prog_name = strrchr(argv[0], '/');
+	if (prog_name) {
+		prog_name++;
+	} else {
+		prog_name = argv[0];
+	}
+
+	struct timeval timeout = { 0, 0 },
+		*t = NULL;
 
 	/* process the program options... */
 	while ((opt = getopt(argc, argv, "h:p:dt:cl")) != EOF) {
@@ -102,10 +103,12 @@ int main (int argc, char **argv)
 		case 'p':  serverport = optarg; break;
 		case 'h':  servername = optarg; break;
 		case 'd':  flags |= FLAG_DEBUG; break;
-		case 't':  timeout.tv_sec = abs(atoi(optarg)); break;
+		case 't':  timeout.tv_sec = abs(atoi(optarg));
+				t = &timeout;
+				break;
 		case 'l':  flags |= FLAG_OPTEOFLOCL; break;
 		case 'c':  flags |= FLAG_OPTEOFCONN; break;
-		default: do_usage();
+		default: do_usage(argv[0]);
 		} /* switch */
 	} /* while */
 
@@ -141,22 +144,21 @@ int main (int argc, char **argv)
 	/* Connect to the server */
 	int sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sd < 0) {
-		ERR(EXIT_FAILURE, "SOCKET: %s (ERR %d)\n",
+		ERR(EXIT_FAILURE, "socket: %s (ERR %d)\n",
 			strerror(errno), errno);
 	} /* if */
 	int res = connect(sd,
 			(struct sockaddr *)&server, sizeof server);
 	if (res < 0) {
-		ERR(EXIT_FAILURE, "CONNECT: %s (ERR %d)",
+		ERR(EXIT_FAILURE, "connect: %s (ERR %d)\n",
 			strerror(errno), errno);
 	} /* if */
 
 	if (flags & FLAG_DEBUG) {
-		fprintf(stderr, "Connected!\n");
+		INFO("Connected!\n");
 	} /* if */
 
-	proc[0].fd_out = sd;
-	proc[1].fd_in  = sd;
+	proc[0].fd_out = proc[1].fd_in = sd;
 
 	/* main loop */
 	for (;;) {
@@ -166,7 +168,7 @@ int main (int argc, char **argv)
 		/* prepare the select call... */
 		FD_ZERO(&readset);
 		for (p = proc; p < proc_end; p++) {
-			if(!p->eof_in) {
+			if(!p->at_eof) {
 				FD_SET(p->fd_in, &readset);
 				if (max_fd < p->fd_in) max_fd = p->fd_in;
 			}
@@ -177,43 +179,51 @@ int main (int argc, char **argv)
 			
 		res = select(max_fd + 1, &readset, NULL, NULL, t);
 
-		int should_exit = 0;
 		switch (res) {
 		case -1: /* error in select */
 			ERR(EXIT_FAILURE, "SELECT: %s (ERR %d)\n",
 				strerror(errno), errno);
 			/* NOTREACHED */
+
 		case 0: /* Timeout */
-			ERR(EXIT_SUCCESS, "Timeout\n");
-			/* NOTREACHED */
+			INFO("Timeout\n");
+			continue;
+
 		default: /* Data on some direction */
 			for(p = proc; p < proc_end; p++) {
 				if (FD_ISSET(p->fd_in, &readset)) {
-					eof = process(p);
-					if (eof && (flags & p->flag_eof)) {
+					if (process(p)) { /* EOF ON THIS SIDE */
 						if (flags & FLAG_DEBUG) {
-							WARN("%s EOF -> EXIT\n",
-								p->from);
+							WARN("%s EOF\n", p->from);
 						} /* if */
+						p->at_eof = 1;
+						if (p->do_shutdown) {
+							res = shutdown(sd, SHUT_WR);
+							if (res < 0) {
+								ERR(EXIT_FAILURE,
+									"shutdown: %s (ERR %d)\n",
+									strerror(errno), errno);
+							}
+							if (flags & FLAG_DEBUG) {
+								LOG("shutdown socket, res = %d\n",
+									res);
+							}
+						}
+						if (flags & p->what_to_chek) {
+							if (flags & FLAG_DEBUG) {
+								WARN("%s EOF -> EXIT\n",
+									p->from);
+							}
+							exit(EXIT_SUCCESS);
+						}
 					} /* if */
 				} /* if */
 			} /* for */
 			break;
 		} /* switch */
 	} /* for (;;) */
+out:
+	exit(EXIT_SUCCESS);
 } /* main */
-
-void do_usage()
-{
-	fprintf(stderr, "Usage: " PROGNAME " [ options ...]\n");
-	fprintf(stderr, "Options:\n");
-  	fprintf(stderr, "  -h server  Specifies a host to contact.\n");
-  	fprintf(stderr, "  -p service Specifies the port to connect to.\n");
-  	fprintf(stderr, "  -d         Debug. Be verbose.\n");
-  	fprintf(stderr, "  -t timeout Set a timeout in secs. (def. no timeout).\n");
-	fprintf(stderr, "  -l         EOF on local side forces exit\n");
-	fprintf(stderr, "  -c         EOF on connection side forces exit\n");
-	exit(0);
-} /* do_usage */
 
 /* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $ */

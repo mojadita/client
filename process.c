@@ -5,42 +5,53 @@
  * License: BSD
  */
 
+#include <sys/types.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "main.h"
 #include "process.h"
+#include "fprintbuf.h"
 
 int process (struct process *proc)
-
-		int fd_in, int fd_out, char *messg)
 {
-	static char buffer[BUFSIZ];
-       	char *p = buffer;
-	int res, tam;
+	static char buffer[65536];
+    char *p = buffer;
 
 	/* let's read the data into the buffer in chunks of BUFSIZ. */
-	res = read (proc->fd_in, buffer, sizeof buffer);
+	int tam = read (proc->fd_in, buffer, sizeof buffer);
 
-	if (flags & FLAG_DEBUG) {
-		fprintbuf(stderr, proc->offset, tam, buffer, messg);
-	}
-
-	switch (res) {
+	switch (tam) {
 	case -1: /* READ ERROR */
-		perror (PROGNAME ": read");
-		exit (EXIT_FAILURE);
+		ERR(EXIT_FAILURE,
+			"READ: %s (ERR %d)",
+			strerror(errno), errno);
 	case 0: /* EOF ON INPUT */
 		return -1;
 	default: /* WE HAVE DATA, SO WRITE IT TO fd_out */
-		tam = res;
+
+		if (flags & FLAG_DEBUG) {
+			fprintbuf(stderr,
+				proc->offset,
+				tam, buffer,
+				"%s (%d bytes)", proc->messg, tam);
+			proc->offset += tam;
+		}
+
 		p = buffer;
 		/* PERHAPS WE CAN'T DO IT IN ONE CHUNK */
 		while (tam > 0) {
-			res = write (fd_out, p, tam);
-			if (res == -1) {
-				perror (PROGNAME": write");
-				exit (EXIT_FAILURE);
+			ssize_t res = write (proc->fd_out, p, tam);
+			if (res < 0) {
+				ERR(EXIT_FAILURE,
+					"WRITE -> %s: %s (ERR %d)\n",
+					proc->from, strerror(errno), errno);
 			} /* if */
 			tam -= res; p += res;
-		} /* if */
-		return 0;
+		} /* while */
 	} /* switch */
+	return 0;
 } /* process */

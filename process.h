@@ -11,10 +11,12 @@
 struct process {
 	int fd_in, fd_out;
 	int flag_eof;
+	int at_eof;
 	off_t offset;
 	char *from;
 	char *messg;
-	int what_to_shut;
+	int do_shutdown;
+	int what_to_chek;
 };
 
 int process (struct process *proc);
