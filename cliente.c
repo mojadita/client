@@ -86,6 +86,7 @@ int main (int argc, char **argv)
 	char *servername = DEFAULT_SERVER;
 	char *serverport = DEFAULT_SERVICE;
 	struct process *p;
+	int to = 0;
 
 	char *prog_name = strrchr(argv[0], '/');
 	if (prog_name) {
@@ -94,25 +95,18 @@ int main (int argc, char **argv)
 		prog_name = argv[0];
 	}
 
-	struct timeval timeout = { 0, 0 },
-		*t = NULL;
-
 	/* process the program options... */
 	while ((opt = getopt(argc, argv, "h:p:dt:cl")) != EOF) {
 		switch (opt) {
 		case 'p':  serverport = optarg; break;
 		case 'h':  servername = optarg; break;
 		case 'd':  flags |= FLAG_DEBUG; break;
-		case 't':  timeout.tv_sec = abs(atoi(optarg));
-				t = &timeout;
-				break;
+		case 't':  to = abs(atoi(optarg)); break;
 		case 'l':  flags |= FLAG_OPTEOFLOCL; break;
 		case 'c':  flags |= FLAG_OPTEOFCONN; break;
 		default: do_usage(argv[0]);
 		} /* switch */
 	} /* while */
-
-	t = (timeout.tv_sec > 0) ? &timeout : NULL;
 
 	/* Obtain the server/port info */
 	service = getservbyname(serverport, "tcp");
@@ -136,7 +130,7 @@ int main (int argc, char **argv)
 	server.sin_addr = *(struct in_addr *)(host->h_addr_list[0]);
 
 	if (flags & FLAG_DEBUG) {
-		WARN("Trying %s:%d\n",
+		INFO("Trying %s:%d\n",
 			inet_ntoa(server.sin_addr),
 			ntohs(server.sin_port));
 	} /* if */
@@ -176,8 +170,11 @@ int main (int argc, char **argv)
 
 		/* if no fd to monitor, then exit */
 		if (max_fd < 0) break;
+
+		struct timeval timeout = { .tv_sec = to, .tv_usec = 0 };
 			
-		res = select(max_fd + 1, &readset, NULL, NULL, t);
+		res = select(max_fd + 1, &readset, NULL, NULL,
+					to ? &timeout : NULL);
 
 		switch (res) {
 		case -1: /* error in select */
@@ -187,14 +184,14 @@ int main (int argc, char **argv)
 
 		case 0: /* Timeout */
 			INFO("Timeout\n");
-			continue;
+			exit(EXIT_SUCCESS);
 
 		default: /* Data on some direction */
 			for(p = proc; p < proc_end; p++) {
 				if (FD_ISSET(p->fd_in, &readset)) {
 					if (process(p)) { /* EOF ON THIS SIDE */
 						if (flags & FLAG_DEBUG) {
-							WARN("%s EOF\n", p->from);
+							INFO("%s EOF\n", p->from);
 						} /* if */
 						p->at_eof = 1;
 						if (p->do_shutdown) {
@@ -205,13 +202,13 @@ int main (int argc, char **argv)
 									strerror(errno), errno);
 							}
 							if (flags & FLAG_DEBUG) {
-								LOG("shutdown socket, res = %d\n",
+								INFO("shutdown socket, res = %d\n",
 									res);
 							}
 						}
 						if (flags & p->what_to_chek) {
 							if (flags & FLAG_DEBUG) {
-								WARN("%s EOF -> EXIT\n",
+								INFO("%s EOF -> EXIT\n",
 									p->from);
 							}
 							exit(EXIT_SUCCESS);
