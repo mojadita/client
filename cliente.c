@@ -30,47 +30,71 @@
  * SUCH DAMAGE.
  */
 
-#define DEFAULT_SERVER "127.0.0.1"
-#define DEFAULT_SERVICE "telnet"
-#define PROGNAME	"cliente"
-
-#include <sys/types.h>
-#include <sys/time.h>
-#include <time.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
-
-#include <stdlib.h>
-#include <stdio.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
+#include <getopt.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
 
-extern char *optarg;
-extern int optind, opterr, optopt;
+#include "main.h"
+#include "process.h"
+
+#define DEFAULT_SERVER		"127.0.0.1"
+#define DEFAULT_SERVICE		"telnet"
+#define PROGNAME			"cliente"
 
 #define FLAG_DEBUG      (1 << 0)
-#define FLAG_EOFSTDIN	(1 << 1)
-#define FLAG_EOFSOCKET	(1 << 2)
-#define FLAG_EOFALL     (FLAG_EOFSTDIN || FLAG_EOFSOCKET)
-#define FLAG_OPTEOFLOCL	(1 << 3)
-#define FLAG_OPTEOFCONN (1 << 4)
+#define FLAG_OPTEOFLOCL	(1 << 1)
+#define FLAG_OPTEOFCONN (1 << 2)
 
 int flags = 0;
 
+#define N				(2)
+
+struct process proc[N] = {
+	{	.fd_in        =  0,
+		.fd_out       = -1,
+		.flag_eof     = FLAG_OPTEOFLOCL,
+		.offset       =  0L,
+	 	.from         = "STDIN",
+		.messg        = ">>> OUTPUT TO SOCKET",
+		.what_to_shut = SHUT_WR,
+	},{
+		.fd_in        = -1,
+		.fd_out       =  1,
+		.flag_eof     = FLAG_OPTEOFCONN,
+		.offset       =  0L,
+		.from         = "SOCKET",
+		.messg        = "<<< INPUT FROM SOCKET",
+		.what_to_shut = SHUT_RD,
+	},
+};
+
+struct process *proc_end = proc + N;
+
 void do_usage (void);
-int process (int fd_in, int fd_out);
 
 int main (int argc, char **argv)
 {
-	int opt, sd, res;
+	int opt;
 	struct sockaddr_in server;
 	struct servent *service, fallback;
 	struct hostent *host;
 	char *servername = DEFAULT_SERVER;
 	char *serverport = DEFAULT_SERVICE;
-	static struct timeval timeout = { 0, 0 }, *t;
+	struct process *p;
+
+	static struct timeval timeout = { 0, 0 },
+		*t;
 
 	/* process the program options... */
 	while ((opt = getopt(argc, argv, "h:p:dt:cl")) != EOF) {
@@ -86,20 +110,21 @@ int main (int argc, char **argv)
 	} /* while */
 
 	t = (timeout.tv_sec > 0) ? &timeout : NULL;
+
 	/* Obtain the server/port info */
-	service = getservbyname (serverport, "tcp");
+	service = getservbyname(serverport, "tcp");
 	if (!service)
 		service = getservbyport(htons(atoi(serverport)), "tcp");
 	if (!service) {
 		service = &fallback;
 		fallback.s_port = htons(atoi(serverport));
 	} /* if */
-	host = gethostbyname (servername);
+
+	host = gethostbyname(servername);
+
 	if (!host) {
-		fprintf (stderr,
-			PROGNAME ": error: %s does not exist\n",
+		ERR(EXIT_FAILURE, "%s does not exist\n",
 			servername);
-		exit (EXIT_FAILURE);
 	} /* if */
 
 	/* Construct the sockaddr_in for the connect system call */
@@ -108,133 +133,87 @@ int main (int argc, char **argv)
 	server.sin_addr = *(struct in_addr *)(host->h_addr_list[0]);
 
 	if (flags & FLAG_DEBUG) {
-		fprintf (stderr, "Trying %s:%d\n",
+		WARN("Trying %s:%d\n",
 			inet_ntoa(server.sin_addr),
-			ntohs (server.sin_port));
+			ntohs(server.sin_port));
 	} /* if */
 
 	/* Connect to the server */
-	sd = socket (AF_INET, SOCK_STREAM, 0);
-	if (sd == -1) {
-		perror (PROGNAME ": socket");
+	int sd = socket(AF_INET, SOCK_STREAM, 0);
+	if (sd < 0) {
+		ERR(EXIT_FAILURE, "SOCKET: %s (ERR %d)\n",
+			strerror(errno), errno);
 	} /* if */
-	res = connect (sd, (struct sockaddr *)&server, sizeof server);
-	if (res == -1) {
-		perror (PROGNAME ": connect");
+	int res = connect(sd,
+			(struct sockaddr *)&server, sizeof server);
+	if (res < 0) {
+		ERR(EXIT_FAILURE, "CONNECT: %s (ERR %d)",
+			strerror(errno), errno);
 	} /* if */
 
-	/* Construct the FD_SET for the select system call */
+	if (flags & FLAG_DEBUG) {
+		fprintf(stderr, "Connected!\n");
+	} /* if */
+
+	proc[0].fd_out = sd;
+	proc[1].fd_in  = sd;
+
+	/* main loop */
 	for (;;) {
 		fd_set readset;
-
-		/* Check for EOF on both paths */
-		if ((flags & FLAG_EOFALL) == FLAG_EOFALL) {
-			break;
-		} /* if */
+		int max_fd = -1;
 
 		/* prepare the select call... */
 		FD_ZERO(&readset);
-		if (!(flags & FLAG_EOFSTDIN))
-			FD_SET(0, &readset);
-		if (!(flags & FLAG_EOFSOCKET))
-			FD_SET(sd, &readset);
+		for (p = proc; p < proc_end; p++) {
+			if(!p->eof_in) {
+				FD_SET(p->fd_in, &readset);
+				if (max_fd < p->fd_in) max_fd = p->fd_in;
+			}
+		}
 
-		res = select (sd+1, &readset, NULL, NULL, t);
+		/* if no fd to monitor, then exit */
+		if (max_fd < 0) break;
+			
+		res = select(max_fd + 1, &readset, NULL, NULL, t);
+
+		int should_exit = 0;
 		switch (res) {
 		case -1: /* error in select */
-			perror (PROGNAME ": select");
-			exit (EXIT_FAILURE);
+			ERR(EXIT_FAILURE, "SELECT: %s (ERR %d)\n",
+				strerror(errno), errno);
+			/* NOTREACHED */
 		case 0: /* Timeout */
-			if (flags & FLAG_DEBUG) {
-				fprintf (stderr,
-					PROGNAME ": Timeout\n");
-				exit (EXIT_SUCCESS);
-			} /* if */
-			break;
+			ERR(EXIT_SUCCESS, "Timeout\n");
+			/* NOTREACHED */
 		default: /* Data on some direction */
-			if (FD_ISSET(0, &readset)) {
-				if (process(0, sd)) {
-					flags |= FLAG_EOFSTDIN;
-					if (flags & FLAG_DEBUG) {
-						fprintf (stderr,
-							PROGNAME
-							": stdin EOF\n");
-					} /* if */
-                    shutdown(sd, SHUT_WR);
-					if (flags & FLAG_OPTEOFLOCL) {
-					  if (flags & FLAG_DEBUG) {
-					    fprintf (stderr,
-					      PROGNAME
-					      ": EOF stdin -> EXIT\n");
-					  } /* if */
-					  exit (EXIT_SUCCESS);
+			for(p = proc; p < proc_end; p++) {
+				if (FD_ISSET(p->fd_in, &readset)) {
+					eof = process(p);
+					if (eof && (flags & p->flag_eof)) {
+						if (flags & FLAG_DEBUG) {
+							WARN("%s EOF -> EXIT\n",
+								p->from);
+						} /* if */
 					} /* if */
 				} /* if */
-			} /* if */
-			if (FD_ISSET(sd, &readset)) {
-				if (process(sd, 1)) {
-					flags |= FLAG_EOFSOCKET;
-					if (flags & FLAG_DEBUG) {
-						fprintf (stderr,
-							PROGNAME
-							": socket EOF\n");
-					} /* if */
-                    shutdown(sd, SHUT_RD);
-					if (flags & FLAG_OPTEOFCONN) {
-					  if (flags & FLAG_DEBUG) {
-					    fprintf (stderr,
-					      PROGNAME
-					      ": EOF socket -> EXIT\n");
-					  } /* if */
-					  exit (EXIT_SUCCESS);
-					} /* if */
-				} /* if */
-			} /* if */
+			} /* for */
+			break;
 		} /* switch */
 	} /* for (;;) */
 } /* main */
 
-int process (int fd_in, int fd_out)
+void do_usage()
 {
-	char buffer[BUFSIZ], *p = buffer;
-	int res, tam;
-
-	/* let's read the data into the buffer in chunks of BUFSIZ. */
-	res = read (fd_in, buffer, sizeof buffer);
-
-	switch (res) {
-	case -1: /* READ ERROR */
-		perror (PROGNAME ": read");
-		exit (EXIT_FAILURE);
-	case 0: /* EOF ON INPUT */
-		return -1;
-	default: /* WE HAVE DATA, SO WRITE IT TO fd_out */
-		tam = res;
-		p = buffer;
-		/* PERHAPS WE CAN'T DO IT IN ONE CHUNK */
-		while (tam > 0) {
-			res = write (fd_out, p, tam);
-			if (res == -1) {
-				perror (PROGNAME": write");
-				exit (EXIT_FAILURE);
-			} /* if */
-			tam -= res; p += res;
-		} /* if */
-		return 0;
-	} /* switch */
-} /* process */
-
-void do_usage ()
-{
-	fprintf (stderr, "Usage: " PROGNAME " [ options ...]\n");
-	fprintf (stderr, "Options:\n");
-  	fprintf (stderr, "  -h server  Specifies a host to contact.\n");
-  	fprintf (stderr, "  -p service Specifies the port to connect to.\n");
-  	fprintf (stderr, "  -d         Debug. Be verbose.\n");
-  	fprintf (stderr, "  -t timeout Set a timeout in secs. (def. no timeout).\n");
-	fprintf (stderr, "  -l         EOF on local side forces exit\n");
-	fprintf (stderr, "  -c         EOF on connection side forces exit\n");
-	exit (0);
+	fprintf(stderr, "Usage: " PROGNAME " [ options ...]\n");
+	fprintf(stderr, "Options:\n");
+  	fprintf(stderr, "  -h server  Specifies a host to contact.\n");
+  	fprintf(stderr, "  -p service Specifies the port to connect to.\n");
+  	fprintf(stderr, "  -d         Debug. Be verbose.\n");
+  	fprintf(stderr, "  -t timeout Set a timeout in secs. (def. no timeout).\n");
+	fprintf(stderr, "  -l         EOF on local side forces exit\n");
+	fprintf(stderr, "  -c         EOF on connection side forces exit\n");
+	exit(0);
 } /* do_usage */
 
 /* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $ */
