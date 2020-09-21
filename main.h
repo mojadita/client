@@ -1,7 +1,7 @@
 /* main.h -- global configuration options and defines.
  * Author: Luis Colorado <luiscoloradourcola@gmail.com>
  * Date: Mon Sep 21 09:48:49 EEST 2020
- * Copyright: 2005-2020 Luis Colorado.  All rights reserved.
+ * Copyright: 1992-2020 Luis Colorado.  All rights reserved.
  * License: BSD
  */
 #ifndef _MAIN_H

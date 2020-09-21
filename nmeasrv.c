@@ -1,8 +1,9 @@
 /* $Id: nmeasrv.c,v 1.7 2012/01/31 21:22:47 luis Exp $
  * Author: Luis Colorado <luiscoloradourcola@gmail.com>
  * Date: Sat Jan 22 12:23:02     2011
- * Disclaimer: (C) 2011 LUIS COLORADO SISTEMAS S.L.
+ * Copyright: (C) 1992-2011 LUIS COLORADO SISTEMAS S.L.
  *		All rights reserved.
+ * License: BSD
  * Description: This program binds to a default port (or
  *		or specified on command line, and redirects all
  *		input to the connections that arrive to that port.

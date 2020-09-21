@@ -1,7 +1,7 @@
 /* process.c -- process implementation.
  * Author: Luis Colorado <luiscoloradourcola@gmail.com>
  * Date: Mon Sep 21 09:15:25 EEST 2020
- * Copyright: (C) 2005-2020 Luis Colorado.  All rights reserved.
+ * Copyright: (C) 1992-2020 Luis Colorado.  All rights reserved.
  * License: BSD
  */
 

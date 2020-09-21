@@ -1,6 +1,8 @@
 /* $Id: fprintbuf.c,v 2.0 2005-10-04 14:54:49 luis Exp $
  * AUTHOR: Luis Colorado <licolorado@indra.es>
  * DATE: 7.10.92.
+ * Copyright: (C) 1992-2020 Luis Colorado.  All rights reserved.
+ * License: BSD.
  * DESC: muestra un buffer de datos en hexadecimal y ASCII.
  */
 

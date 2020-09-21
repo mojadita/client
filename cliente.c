@@ -1,9 +1,8 @@
 /* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $
  * Author: Luis Colorado <lc@luiscoloradosistemas.com>
  * Date: Thu Feb 26 12:44:15 MET 1998
- *
- * Copyright (c) 1998-2017 by LUIS COLORADO
- * All rights reserved.
+ * Copyright (c) 1992-2020 by LUIS COLORADO.  All rights reserved.
+ * License: BSD
  *
  * This software was developed by LUIS COLORADO
  *

@@ -1,7 +1,7 @@
 /* usage.c -- output usage for program.
  * Author: Luis Colorado <luiscoloradourcola@gmail.com>
  * Date: 
- * Copyright: (C) 2015-2020 Luis Colorado.  All rights reserved.
+ * Copyright: (C) 1992-2020 Luis Colorado.  All rights reserved.
  * License: BSD.
  */
 
