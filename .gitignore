@@ -1,3 +1,5 @@
+CVS/
 cliente
 nmeasrv
+srv
 *.o
