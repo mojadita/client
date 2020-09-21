@@ -1,6 +1,6 @@
 /* usage.h -- usage interface.
  * Author: Luis Colorado <luiscoloradourcola@gmail.com>
- * Date:
+ * Date: Mon Sep 21 22:07:04 EEST 2020
  * Copyright: (C) 1992-2020 Luis Colorado.  All rights reserved.
  * License: BSD.
  */
