@@ -85,16 +85,15 @@ char *getTs(void)
 	int res = gettimeofday(&now, NULL);
 	if (res < 0) return NULL;
 
-	size_t n = lap(&origin, now, buf, bufsz);
+	size_t n = lap(&last, now, buf, bufsz);
 	buf     += n;
 	bufsz   -= n;
 
-	if (bufsz >= 2) {
-		*buf++ = '/';
-		bufsz--;
-	}
+	n  = snprintf(buf, bufsz, " ");
+	buf     += n;
+	bufsz   += n;
 
-	n        = lap(&last, now, buf, bufsz);
+	n        = lap(&origin, now, buf, bufsz);
 	buf     += n;
 	bufsz	-= n;
 
