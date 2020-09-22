@@ -37,7 +37,7 @@ int fprintbuf (FILE *f,	/* fichero de salida */
 		escritos += fprintf (f, "%08lx : ", off);
 		for (i = 0; i < TAM_REG; i++) {
 			if (t > 0)
-				escritos += fprintf (f, "%02x ", *b);
+				escritos += fprintf (f, "%02x ", *b & 0xff);
 			else escritos += fprintf (f, "   ");
 			off++;
 			t--;
