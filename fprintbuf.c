@@ -19,7 +19,7 @@ static char *id = "$Id: fprintbuf.c,v 2.0 2005-10-04 14:54:49 luis Exp $\n";
 int fprintbuf (FILE *f,	/* fichero de salida */
 	long off,			/* offset to use */
 	int t,				/* tamano del buffer */
-	unsigned char *b,	/* puntero al buffer */
+	char *b,			/* puntero al buffer */
 	char *fmt, ...)		/* rotulo de cabecera */
 {
 	int i;
