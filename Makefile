@@ -15,10 +15,10 @@ RM		?= rm -f
 all: $(TARGETS)
 clean:
 	$(RM) $(TOCLEAN) 
-.depend:
+.depend:  $(TARGETS:=.c) $(cliente_objs:.o=.c)
 	mkdep $(TARGETS:=.c) $(cliente_objs:.o=.c)
 
-cliente_objs = cliente.o fprintbuf.o process.o usage.o
+cliente_objs = cliente.o fprintbuf.o process.o usage.o timestamp.o
 TOCLEAN += $(cliente_objs)
 
 cliente: $(cliente_objs)

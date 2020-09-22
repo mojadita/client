@@ -15,6 +15,7 @@
 #include "main.h"
 #include "process.h"
 #include "fprintbuf.h"
+#include "timestamp.h"
 
 int process (struct process *proc)
 {
@@ -37,7 +38,7 @@ int process (struct process *proc)
 			fprintbuf(logger,
 				proc->offset,
 				tam, buffer,
-				"%s (%d bytes)", proc->messg, tam);
+				"(%s) %s (%d bytes)", getTs(), proc->messg, tam);
 			proc->offset += tam;
 		}
 

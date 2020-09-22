@@ -7,16 +7,16 @@
 #ifndef _MAIN_H
 #define _MAIN_H
 
-#define FLAG_DEBUG      (1 << 0)
+#include "timestamp.h"
 
-#define F(_fmt) __FILE__":%d:%s: "_fmt,__LINE__,__func__
+#define F(_fmt) __FILE__":%d:%s:(%s)"_fmt,__LINE__,__func__,getTs()
 
 #define WARN(_fmt, ...) do {								\
-		fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);	\
+		fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);		\
 	} while(0)
 
 #define INFO(_fmt, ...) do {								\
-		fprintf(logger, F(" INFO:"_fmt),##__VA_ARGS__);	\
+		fprintf(logger, F(" INFO:"_fmt),##__VA_ARGS__);		\
 	} while(0)
 
 #define ERR(_code, _fmt, ...) do {							\
@@ -24,6 +24,8 @@
 			##__VA_ARGS__);									\
 		exit(_code);										\
 	} while(0)
+
+#define FLAG_DEBUG      (1 << 0)
 
 extern int flags; /* the configuration flags are known everywhere */
 

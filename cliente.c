@@ -72,6 +72,8 @@ struct process proc[] = {
 	},
 };
 
+char ts_buffer[128];
+
 struct process *proc_end = (struct process *)(&proc + 1);
 
 FILE *logger;
@@ -86,6 +88,8 @@ int main (int argc, char **argv)
 	char *serverport = DEFAULT_SERVICE;
 	struct process *p;
 	int to = 0;
+
+	startTs();
 
 	char *prog_name = strrchr(argv[0], '/');
 	if (prog_name) {
@@ -161,6 +165,7 @@ int main (int argc, char **argv)
 	if (flags & FLAG_DEBUG) {
 		INFO("Connected!\n");
 	} /* if */
+	startTs();
 
 	proc[0].fd_out = proc[1].fd_in = sd;
 
