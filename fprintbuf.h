@@ -17,7 +17,7 @@ static char FPRINTBUF_H_RCSId[] = "\n$Id: fprintbuf.h,v 2.0 2005-10-04 14:54:49 
 int fprintbuf (FILE *f,	/* output file */
 	long off,			/* offset of record. */
 	int t,				/* buffer size */
-	unsigned char *b,	/* pointer to buffer */
+	char *b,			/* pointer to buffer */
 	char *fmt, ...);	/* first line print */
 
 #endif /* FPRINTBUF_H */
