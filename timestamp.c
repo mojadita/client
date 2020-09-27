@@ -89,7 +89,7 @@ char *getTs(void)
 	buf     += n;
 	bufsz   -= n;
 
-	n  = snprintf(buf, bufsz, " ");
+	n  = snprintf(buf, bufsz, "|");
 	buf     += n;
 	bufsz   += n;
 
