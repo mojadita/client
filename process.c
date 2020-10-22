@@ -20,7 +20,7 @@
 #define logger proc->logger
 #define chr &proc->chrono
 
-void shut_socket(struct process *proc)
+void sht_sck(struct process *proc)
 {
     int res = shutdown(proc->fd_to, SHUT_WR);
     if (res < 0) {

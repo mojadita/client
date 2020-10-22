@@ -149,11 +149,11 @@ int main (int argc, char **argv)
     proc_sender.fd_from = 0; /* STDIN */
     proc_sender.fd_to   = sd;
     proc_sender.logger  = logger;
-    proc_sender.at_eof  = shut_socket;
+    proc_sender.at_eof  = sht_sck;
     proc_sender.offset  = 0;
     proc_sender.from    = "STDIN";
     proc_sender.to      = "SERVER";
-    proc_sender.messg   = "\033[1;32mSTDIN >>> SERVER\033[m";
+    proc_sender.messg   = "\033[1;31mSTDIN  >>> SERVER\033[m";
     proc_sender.close_messg = "shutdown server";
     proc_sender.buffer  = malloc(BUFFER_SIZE);
     struct process proc_receiver;
@@ -164,7 +164,7 @@ int main (int argc, char **argv)
     proc_receiver.offset  = 0;
     proc_receiver.from    = "SERVER";
     proc_receiver.to      = "STDOUT";
-    proc_receiver.messg   = "\033[1;33mSERVER >>> STDOUT\033[m";
+    proc_receiver.messg   = "\033[1;32mSTDOUT <<< SERVER\033[m";
     proc_receiver.close_messg = "terminating";
     proc_receiver.buffer  = malloc(BUFFER_SIZE);
 

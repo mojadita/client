@@ -28,7 +28,7 @@ struct process {
 
 void *process(void *param);
 
-void shut_socket(struct process *proc);
+void sht_sck(struct process *proc);
 void close_output(struct process *proc);
 
 #endif /* _PROCESS_H */
