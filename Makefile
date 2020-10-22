@@ -18,11 +18,13 @@ clean:
 .depend:  $(TARGETS:=.c) $(cliente_objs:.o=.c)
 	mkdep $(TARGETS:=.c) $(cliente_objs:.o=.c)
 
-cliente_objs = cliente.o fprintbuf.o process.o usage.o timestamp.o
+cliente_objs		= cliente.o fprintbuf.o process.o usage.o timestamp.o
+cliente_ldlfags		= -pthread
+cliente_libs		= -lpthread
 TOCLEAN += $(cliente_objs)
 
 cliente: $(cliente_objs)
-	$(CC) $(LDFLAGS) -o $@ $(cliente_objs)
+	$(CC) $(LDFLAGS) $(cliente_ldflags) -o $@ $(cliente_objs) $(cliente_libs)
 
 # $Id: Makefile,v 1.1 2012/01/21 13:38:38 luis Exp $
 #include .depend

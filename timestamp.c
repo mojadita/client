@@ -62,30 +62,26 @@ static size_t lap(
 }
 #undef P
 
-static struct timeval origin = {0, 0};
-static struct timeval last   = {0, 0};
-
-int startTs(void)
+int startTs(struct chrono *chr)
 {
-	int res = gettimeofday(&origin, NULL);
+	int res = gettimeofday(&chr->start, NULL);
 	if (res >= 0) {
-		last = origin;
+		chr->last = chr->start;
 	}
 	return res;
 }
 
-static char buffer[256];
-
-char *getTs(void)
+char *getTs(struct chrono *chr)
 {
-	char *buf    = buffer;
-	size_t bufsz = sizeof buffer;
+	char *buf    = chr->buffer;
+	size_t bufsz = sizeof chr->buffer;
+
 	struct timeval now;
 
 	int res = gettimeofday(&now, NULL);
 	if (res < 0) return NULL;
 
-	size_t n = lap(&last, now, buf, bufsz);
+	size_t n = lap(&chr->last, now, buf, bufsz);
 	buf     += n;
 	bufsz   -= n;
 
@@ -93,13 +89,13 @@ char *getTs(void)
 	buf     += n;
 	bufsz   += n;
 
-	n        = lap(&origin, now, buf, bufsz);
+	n        = lap(&chr->start, now, buf, bufsz);
 	buf     += n;
 	bufsz	-= n;
 
-	last     = now;
+	chr->last= now;
 
-	return buffer;
+	return chr->buffer;
 }
 
 #undef APP

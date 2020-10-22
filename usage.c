@@ -11,8 +11,15 @@
 #include "main.h"
 #include "usage.h"
 
+#define logger stderr
+
+#define chr &chrono
+
+static struct chrono chrono;
+
 void do_usage(char *prog)
 {
+	startTs(&chrono);
 	INFO("Usage: %s [ options ...]\n", prog);
 	INFO("Options:\n");
   	INFO("  -h server  Specifies a host to contact.\n");

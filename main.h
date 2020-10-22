@@ -9,7 +9,7 @@
 
 #include "timestamp.h"
 
-#define F(_fmt) __FILE__":%d:%s:(%s)"_fmt,__LINE__,__func__,getTs()
+#define F(_fmt) __FILE__":%d:%s:(%s)"_fmt,__LINE__,__func__,getTs(chr)
 
 #define WARN(_fmt, ...) do {								\
 		fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);		\

@@ -5,54 +5,64 @@
  * License: BSD
  */
 
-#include <sys/types.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #include "main.h"
 #include "process.h"
-#include "fprintbuf.h"
 #include "timestamp.h"
 
-int process (struct process *proc)
+#define logger proc->logger
+#define chr &proc->chrono
+
+void shut_socket(struct process *proc)
 {
-	static char buffer[65536];
-    char *p = buffer;
-
-	/* let's read the data into the buffer in chunks of BUFSIZ. */
-	int tam = read (proc->fd_in, buffer, sizeof buffer);
-
-	switch (tam) {
-	case -1: /* READ ERROR */
+	int res = shutdown(proc->fd_to, SHUT_WR);
+	if (res < 0) {
 		ERR(EXIT_FAILURE,
-			"READ: %s (ERR %d)",
+			"SHUTDOWN %s %s (ERR %d)\n",
+			proc->messg,
 			strerror(errno), errno);
-	case 0: /* EOF ON INPUT */
-		return -1;
-	default: /* WE HAVE DATA, SO WRITE IT TO fd_out */
+	}
+	INFO("%s: SHUTDOWN OK\n", proc->messg);
+}
 
-		if (flags & FLAG_DEBUG) {
-			fprintbuf(logger,
-				proc->offset,
-				tam, buffer,
-				"(%s) %s (%d bytes)", getTs(), proc->messg, tam);
-			proc->offset += tam;
-		}
+void *process(void *param)
+{
+	struct process *proc = param;
 
-		p = buffer;
+	startTs(&proc->chrono);
+
+	int size;
+
+	while ((size = read (proc->fd_from, proc->buffer, BUFFER_SIZE)) > 0) {
+		char *p = proc->buffer;
+		INFO("%s: %d bytes read\n", proc->messg, size);
 		/* PERHAPS WE CAN'T DO IT IN ONE CHUNK */
-		while (tam > 0) {
-			ssize_t res = write (proc->fd_out, p, tam);
+		while (size > 0) {
+			ssize_t res = write (proc->fd_to, p, size);
 			if (res < 0) {
 				ERR(EXIT_FAILURE,
-					"WRITE -> %s: %s (ERR %d)\n",
-					proc->from, strerror(errno), errno);
+					"write to %s: %s (ERR %d)\n",
+					proc->to, strerror(errno), errno);
 			} /* if */
-			tam -= res; p += res;
+			size -= res; p += res;
 		} /* while */
-	} /* switch */
-	return 0;
+	} /* while */
+
+	if (size < 0) {
+		ERR(EXIT_FAILURE,
+			"read from %s: %s (ERR %d)\n",
+			proc->from, strerror(errno), errno);
+	} else { /* size == 0 ==> EOF */
+		INFO("%s: EOF\n", proc->messg);
+		if (proc->at_eof)
+			proc->at_eof(proc);
+	}
+	return NULL;
 } /* process */

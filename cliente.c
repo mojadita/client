@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 
 #include "main.h"
 #include "usage.h"
@@ -51,32 +52,9 @@
 #define DEFAULT_SERVER		"127.0.0.1"
 #define DEFAULT_SERVICE		"telnet"
 
+#define chr &chrono_main
+
 int flags = 0;
-
-struct process proc[] = {
-	{	.fd_in        =  0,
-		.fd_out       = -1,
-		.at_eof       =  0,
-		.offset       =  0L,
-	 	.from         = "STDIN",
-		.messg        = "\033[1;33m>>> OUTPUT TO SOCKET\033[m",
-		.do_shutdown  = 1,
-	},{
-		.fd_in        = -1,
-		.fd_out       =  1,
-		.at_eof       =  0,
-		.offset       =  0L,
-		.from         = "SOCKET",
-		.messg        = "\033[1;32m<<< INPUT FROM SOCKET\033[m",
-		.do_shutdown  = 0,
-	},
-};
-
-char ts_buffer[128];
-
-struct process *proc_end = (struct process *)(&proc + 1);
-
-FILE *logger;
 
 int main (int argc, char **argv)
 {
@@ -88,8 +66,8 @@ int main (int argc, char **argv)
 	char *serverport = DEFAULT_SERVICE;
 	struct process *p;
 	int to = 0;
-
-	startTs();
+	FILE *logger = stderr;
+	struct chrono chrono_main;
 
 	char *prog_name = strrchr(argv[0], '/');
 	if (prog_name) {
@@ -98,7 +76,7 @@ int main (int argc, char **argv)
 		prog_name = argv[0];
 	}
 
-	logger = stderr;
+	startTs(&chrono_main);
 
 	/* process the program options... */
 	while ((opt = getopt(argc, argv, "h:p:dt:l:")) != EOF) {
@@ -147,13 +125,14 @@ int main (int argc, char **argv)
 			inet_ntoa(server.sin_addr),
 			ntohs(server.sin_port));
 	} /* if */
-
+	
 	/* Connect to the server */
 	int sd = socket(AF_INET, SOCK_STREAM, 0);
 	if (sd < 0) {
 		ERR(EXIT_FAILURE, "socket: %s (ERR %d)\n",
 			strerror(errno), errno);
 	} /* if */
+
 	int res = connect(sd,
 			(struct sockaddr *)&server, sizeof server);
 	if (res < 0) {
@@ -165,77 +144,49 @@ int main (int argc, char **argv)
 	if (flags & FLAG_DEBUG) {
 		INFO("Connected!\n");
 	} /* if */
-	startTs();
 
-	proc[0].fd_out = proc[1].fd_in = sd;
+	struct process proc_sender;
+	proc_sender.fd_from = 0; /* STDIN */
+	proc_sender.fd_to   = sd;
+	proc_sender.logger  = logger;
+    proc_sender.at_eof  = shut_socket;
+	proc_sender.offset  = 0;
+    proc_sender.from    = "STDIN";
+    proc_sender.to      = "SERVER";
+    proc_sender.messg   = "\033[1;32mSTDIN >>> SERVER\033[m";
+	proc_sender.close_messg = "shutdown server";
+    proc_sender.buffer  = malloc(BUFFER_SIZE);
+	struct process proc_receiver;
+	proc_receiver.fd_from = sd;
+	proc_receiver.fd_to   = 1; /* STDOUT */
+	proc_receiver.logger  = logger;
+	proc_receiver.at_eof  = NULL;
+	proc_receiver.offset  = 0;
+	proc_receiver.from    = "SERVER";
+	proc_receiver.to      = "STDOUT";
+    proc_receiver.messg   = "\033[1;33mSTDOUT <<< SERVER\033[m";
+	proc_receiver.close_messg = "terminating";
+    proc_receiver.buffer  = malloc(BUFFER_SIZE);
 
-	/* main loop */
-	for (;;) {
-		fd_set readset;
-		int max_fd = -1;
+	pthread_t sender, receiver;
+    res = pthread_create(&sender, NULL, process, &proc_sender);
+	if (res < 0) {
+		ERR(EXIT_FAILURE,
+			"pthread_create: %s (ERR %d)\n",
+			strerror(errno), errno);
+	}
+	res = pthread_create(&receiver, NULL, process, &proc_receiver);
+	if (res < 0) {
+		ERR(EXIT_FAILURE,
+			"pthread_create: %s (ERR %d)\n",
+			strerror(errno), errno);
+	}
 
-		/* prepare the select call... */
-		FD_ZERO(&readset);
-		for (p = proc; p < proc_end; p++) {
-			if(!p->at_eof) {
-				FD_SET(p->fd_in, &readset);
-				if (max_fd < p->fd_in) max_fd = p->fd_in;
-			}
-		}
+	pthread_join(sender, NULL);
+	pthread_join(receiver, NULL);
 
-		/* if no fd to monitor, then exit */
-		if (max_fd < 0) break;
-
-		struct timeval timeout = { .tv_sec = to, .tv_usec = 0 };
-			
-		res = select(max_fd + 1, &readset, NULL, NULL,
-					to ? &timeout : NULL);
-
-		switch (res) {
-		case -1: /* error in select */
-			ERR(EXIT_FAILURE, "SELECT: %s (ERR %d)\n",
-				strerror(errno), errno);
-			/* NOTREACHED */
-
-		case 0: /* Timeout */
-			INFO("Timeout\n");
-			exit(EXIT_SUCCESS);
-
-		default: /* Data on some direction */
-			for(p = proc; p < proc_end; p++) {
-				if (FD_ISSET(p->fd_in, &readset)) {
-					if (process(p)) { /* EOF ON THIS SIDE */
-						if (flags & FLAG_DEBUG) {
-							INFO("%s EOF\n", p->from);
-						} /* if */
-						p->at_eof = 1;
-						if (p->do_shutdown) {
-							res = shutdown(sd, SHUT_WR);
-							if (res < 0) {
-								ERR(EXIT_FAILURE,
-									"shutdown: %s (ERR %d)\n",
-									strerror(errno), errno);
-							}
-							if (flags & FLAG_DEBUG) {
-								INFO("shutdown socket, res = %d\n",
-									res);
-							}
-						}
-						if (flags & p->what_to_chek) {
-							if (flags & FLAG_DEBUG) {
-								INFO("%s EOF -> EXIT\n",
-									p->from);
-							}
-							exit(EXIT_SUCCESS);
-						}
-					} /* if */
-				} /* if */
-			} /* for */
-			break;
-		} /* switch */
-	} /* for (;;) */
-out:
-	exit(EXIT_SUCCESS);
+	INFO("program ended\n");
+	
 } /* main */
 
 /* $Id: cliente.c,v 1.6 2012/01/21 18:14:31 luis Exp $ */

@@ -7,17 +7,28 @@
 #ifndef _PROCESS_H
 #define _PROCESS_H
 
+#include <stdio.h>
+
+#define BUFFER_SIZE		(65536)
+
 /* process info, one per direction */
 struct process {
-	int fd_in, fd_out;
-	int at_eof;
+	int	fd_from,
+		fd_to;
+	FILE *logger;
+	void (*at_eof)(struct process *p);
 	off_t offset;
 	char *from;
+	char *to;
 	char *messg;
-	int do_shutdown;
-	int what_to_chek;
+	char *close_messg;
+	char *buffer;
+	struct chrono chrono;
 };
 
-int process (struct process *proc);
+void *process(void *param);
+
+void shut_socket(struct process *proc);
+void close_output(struct process *proc);
 
 #endif /* _PROCESS_H */
