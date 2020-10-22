@@ -164,7 +164,7 @@ int main (int argc, char **argv)
     proc_receiver.offset  = 0;
     proc_receiver.from    = "SERVER";
     proc_receiver.to      = "STDOUT";
-    proc_receiver.messg   = "\033[1;33mSTDOUT <<< SERVER\033[m";
+    proc_receiver.messg   = "\033[1;33mSERVER >>> STDOUT\033[m";
     proc_receiver.close_messg = "terminating";
     proc_receiver.buffer  = malloc(BUFFER_SIZE);
 

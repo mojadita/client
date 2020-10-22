@@ -29,7 +29,8 @@ void shut_socket(struct process *proc)
             proc->messg,
             strerror(errno), errno);
     }
-    INFO("%s: SHUTDOWN OK\n", proc->messg);
+    INFO("%s: %8ld: SHUTDOWN OK\n",
+		proc->messg, proc->offset);
 }
 
 void *process(void *param)
@@ -41,6 +42,8 @@ void *process(void *param)
     int size;
 
     while ((size = read (proc->fd_from, proc->buffer, BUFFER_SIZE)) > 0) {
+        INFO("%s: %8lu: %d bytes.\n",
+                proc->messg, proc->offset, size);
         char *p = proc->buffer;
         /* PERHAPS WE CAN'T DO IT IN ONE CHUNK */
         while (size > 0) {
@@ -53,8 +56,6 @@ void *process(void *param)
             size -= res; p += res;
             proc->offset += res;
         } /* while */
-        INFO("%s: %d bytes transferred (total is %ld)\n",
-                proc->messg, size, proc->offset);
     } /* while */
 
     if (size < 0) {
@@ -62,7 +63,7 @@ void *process(void *param)
             "read from %s: %s (ERR %d)\n",
             proc->from, strerror(errno), errno);
     } else { /* size == 0 ==> EOF */
-        INFO("%s: EOF\n", proc->messg);
+        INFO("%s: %8lu: EOF\n", proc->messg, proc->offset);
         if (proc->at_eof)
             proc->at_eof(proc);
     }
