@@ -3,3 +3,4 @@ cliente
 nmeasrv
 srv
 *.o
+.depend
