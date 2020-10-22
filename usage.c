@@ -19,15 +19,15 @@ static struct chrono chrono;
 
 void do_usage(char *prog)
 {
-	startTs(&chrono);
-	INFO("Usage: %s [ options ...]\n", prog);
-	INFO("Options:\n");
-  	INFO("  -h server  Specifies a host to contact.\n");
-  	INFO("  -p service Specifies the port to connect to.\n");
-  	INFO("  -d         Debug. Be verbose.\n");
-  	INFO("  -t timeout Set a timeout in secs. (def. no timeout).\n");
-	INFO("  -l         EOF on local side forces exit\n");
-	INFO("  -c         EOF on connection side forces exit\n");
+    startTs(&chrono);
+    INFO("Usage: %s [ options ...]\n", prog);
+    INFO("Options:\n");
+    INFO("  -h server  Specifies a host to contact.\n");
+    INFO("  -p service Specifies the port to connect to.\n");
+    INFO("  -d         Debug. Be verbose.\n");
+    INFO("  -t timeout Set a timeout in secs. (def. no timeout).\n");
+    INFO("  -l         EOF on local side forces exit\n");
+    INFO("  -c         EOF on connection side forces exit\n");
 
-	exit(EXIT_SUCCESS);
+    exit(EXIT_SUCCESS);
 } /* do_usage */

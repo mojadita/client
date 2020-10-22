@@ -9,21 +9,21 @@
 
 #include <stdio.h>
 
-#define BUFFER_SIZE		(65536)
+#define BUFFER_SIZE     (65536)
 
 /* process info, one per direction */
 struct process {
-	int	fd_from,
-		fd_to;
-	FILE *logger;
-	void (*at_eof)(struct process *p);
-	off_t offset;
-	char *from;
-	char *to;
-	char *messg;
-	char *close_messg;
-	char *buffer;
-	struct chrono chrono;
+    int fd_from,
+        fd_to;
+    FILE *logger;
+    void (*at_eof)(struct process *p);
+    off_t offset;
+    char *from;
+    char *to;
+    char *messg;
+    char *close_messg;
+    char *buffer;
+    struct chrono chrono;
 };
 
 void *process(void *param);

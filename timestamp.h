@@ -8,8 +8,8 @@
 #define _TIMESTAMP_H
 
 struct chrono {
-	struct timeval start, last;
-	char buffer[128]; /* to print the timestamp. */
+    struct timeval start, last;
+    char buffer[128]; /* to print the timestamp. */
 };
 
 int startTs(struct chrono *p);

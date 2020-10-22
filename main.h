@@ -11,19 +11,19 @@
 
 #define F(_fmt) __FILE__":%d:%s:(%s)"_fmt,__LINE__,__func__,getTs(chr)
 
-#define WARN(_fmt, ...) do {								\
-		fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);		\
-	} while(0)
+#define WARN(_fmt, ...) do {                                \
+        fprintf(logger, F(" WARN:"_fmt),##__VA_ARGS__);     \
+    } while(0)
 
-#define INFO(_fmt, ...) do {								\
-		fprintf(logger, F(" INFO:"_fmt),##__VA_ARGS__);		\
-	} while(0)
+#define INFO(_fmt, ...) do {                                \
+        fprintf(logger, F(" INFO:"_fmt),##__VA_ARGS__);     \
+    } while(0)
 
-#define ERR(_code, _fmt, ...) do {							\
-		fprintf(logger, F("ERROR: "_fmt),					\
-			##__VA_ARGS__);									\
-		exit(_code);										\
-	} while(0)
+#define ERR(_code, _fmt, ...) do {                          \
+        fprintf(logger, F("ERROR: "_fmt),                   \
+            ##__VA_ARGS__);                                 \
+        exit(_code);                                        \
+    } while(0)
 
 #define FLAG_DEBUG      (1 << 0)
 

@@ -5,7 +5,7 @@
  * License: BSD.
  */
 
-#define PROGNAME	"srv"
+#define PROGNAME    "srv"
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -30,18 +30,18 @@ int num_clients = 0;
 
 int main (int argc, char **argv)
 {
-	int opt, sd, res;
+    int opt, sd, res;
 
-	/* process the program options... */
-	while ((opt = getopt(argc, argv, "b:l:n:")) != EOF) {
-		switch (opt) {
+    /* process the program options... */
+    while ((opt = getopt(argc, argv, "b:l:n:")) != EOF) {
+        switch (opt) {
         case 'b': bind_port = atol(optarg); break;
         case 'l': listen_val = atol(optarg); break;
         case 'n': num_clients = atol(optarg); break;
-		} /* switch */
-	} /* while */
+        } /* switch */
+    } /* while */
 
-	/* Construct the sockaddr_in for the connect system call */
+    /* Construct the sockaddr_in for the connect system call */
     for(;;) {
         sd = socket (AF_INET, SOCK_STREAM, 0);
         if (sd < 0) {
